@@ -1,0 +1,1120 @@
+sites:
+  - site_id: sample_news
+    site_name: Sample News
+    enabled: false
+    search_url_template: "https://example.com/search?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: ".search-result"
+    title_selector: ".title"
+    url_selector: "a"
+    date_selector: ".date"
+    snippet_selector: ".snippet"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Example static search page"
+
+  - site_id: sample_dynamic_news
+    site_name: Sample Dynamic News
+    enabled: false
+    search_url_template: "https://dynamic.example.com/search?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: true
+    result_item_selector: ".result"
+    title_selector: ".result-title"
+    url_selector: "a"
+    date_selector: ".published-date"
+    snippet_selector: ".summary"
+    rate_limit_seconds: 5
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Skipped when Playwright is disabled"
+
+  - site_id: asahi
+    site_name: 朝日新聞デジタル
+    enabled: true
+    search_url_template: "https://sitesearch.asahi.com/sitesearch/?Keywords={query}&Searchsubmit=%E6%A4%9C%E7%B4%A2&iref=pc_gnavi"
+    query_encoding: "utf-8"
+    requires_playwright: true
+    result_item_selector: "article, .SearchResult, .search-result, .List li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date, .Date"
+    snippet_selector: "p, .summary, .lead"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Separate public site-search host; static HTML did not include rendered results in pilot, so Playwright is required."
+
+  - site_id: yomiuri
+    site_name: 読売新聞オンライン
+    enabled: true
+    search_url_template: "https://www.yomiuri.co.jp/web-search/?st=1&wo={query}&ac=srch"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: ".search-article-list article"
+    title_selector: ".c-list-title a"
+    url_selector: ".c-list-title a"
+    date_selector: ".c-list-date"
+    snippet_selector: null
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form-confirmed search endpoint; selectors verified against pilot static HTML."
+
+  - site_id: mainichi
+    site_name: 毎日新聞
+    enabled: true
+    search_url_template: "https://mainichi.jp/search?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "#searchresults-list .articlelist > li"
+    title_selector: ".articlelist-title"
+    url_selector: "a"
+    date_selector: ".articletag-date"
+    snippet_selector: ".text-ellipsis-2"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public search page; selectors verified against pilot static HTML."
+
+  - site_id: sankei
+    site_name: 産経ニュース
+    enabled: true
+    search_url_template: "https://www.sankei.com/search/?kw={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .article-list li, .search-result, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Form-confirmed search parameter; JavaScript behavior should be checked during site-specific research."
+
+  - site_id: nikkei
+    site_name: 日本経済新聞
+    enabled: true
+    search_url_template: "https://www.nikkei.com/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: ".search__result-item"
+    title_selector: ".nui-card__title a"
+    url_selector: ".nui-card__title a[href^='/article/']"
+    date_selector: ".nui-card__meta-pubdate"
+    snippet_selector: ".nui-card__excerpt"
+    rate_limit_seconds: 5
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public search page; paywalled result targets may appear but article bodies are out of scope."
+
+  - site_id: tokyo_np
+    site_name: 東京新聞
+    enabled: true
+    search_url_template: "https://www.tokyo-np.co.jp/search_result?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .article-list li, .search-result, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Search endpoint is /search_result?q=. Search cards may omit dates; article JSON-LD is used as fallback."
+
+  - site_id: chunichi
+    site_name: 中日新聞Web
+    enabled: true
+    search_url_template: "https://www.chunichi.co.jp/search_result?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: true
+    result_item_selector: "article, .article-list li, .search-result, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Search endpoint is /search_result?q=. Results are Google CSE cards rendered by JavaScript."
+
+  - site_id: hokkaido_np
+    site_name: 北海道新聞デジタル
+    enabled: true
+    search_url_template: "https://www.hokkaido-np.co.jp/search/?kw={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form; may rate-limit. Selector verification pending."
+
+  - site_id: kahoku
+    site_name: 河北新報オンライン
+    enabled: true
+    search_url_template: "https://kahoku.news/search/?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form; PopIn script present. Selector verification pending."
+
+  - site_id: toonippo
+    site_name: 東奥日報
+    enabled: true
+    search_url_template: "https://www.toonippo.co.jp/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Regional paper; selector verification pending."
+
+  - site_id: sakigake
+    site_name: 秋田魁新報
+    enabled: true
+    search_url_template: "https://www.sakigake.jp/news/search.jsp?ptxt={query}&pak=1&pnw=0"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Legacy JSP search parameters from public form; selector verification pending."
+
+  - site_id: yamagata_np
+    site_name: 山形新聞
+    enabled: true
+    search_url_template: "https://www.yamagata-np.jp/search.php?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Regional paper; selector verification pending."
+
+  - site_id: minyu
+    site_name: 福島民友新聞
+    enabled: true
+    search_url_template: "https://www.minyu-net.com/search/?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Regional paper; selector verification pending."
+
+  - site_id: shimotsuke
+    site_name: 下野新聞 SOON
+    enabled: true
+    search_url_template: "https://www.shimotsuke.co.jp/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: jomo
+    site_name: 上毛新聞
+    enabled: true
+    search_url_template: "https://www.jomo-news.co.jp/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: chibanippo
+    site_name: 千葉日報
+    enabled: true
+    search_url_template: "https://www.chibanippo.co.jp/search?search_api_fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Drupal-style public search form; verify exact parameter variants."
+
+  - site_id: kanaloco
+    site_name: カナロコ 神奈川新聞
+    enabled: true
+    search_url_template: "https://www.kanaloco.jp/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Regional paper; selector verification pending."
+
+  - site_id: niigata_nippo
+    site_name: 新潟日報デジタルプラス
+    enabled: true
+    search_url_template: "https://www.niigata-nippo.co.jp/list/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: shinmai
+    site_name: 信濃毎日新聞デジタル
+    enabled: true
+    search_url_template: "https://www.shinmai.co.jp/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Regional paper; selector verification pending."
+
+  - site_id: shizushin
+    site_name: 静岡新聞
+    enabled: true
+    search_url_template: "https://www.at-s.com/search/?query={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Regional paper via at-s.com; selector verification pending."
+
+  - site_id: kyoto_np
+    site_name: 京都新聞
+    enabled: true
+    search_url_template: "https://www.kyoto-np.co.jp/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: kobe_np
+    site_name: 神戸新聞NEXT
+    enabled: true
+    search_url_template: "https://www.kobe-np.co.jp/LibraryFiles/web/kbsearch.php?kw={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Older CGI search path; likely fragile and should be fixture-verified."
+
+  - site_id: chugoku_np
+    site_name: 中国新聞デジタル
+    enabled: true
+    search_url_template: "https://www.chugoku-np.co.jp/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: shikoku_np
+    site_name: 四国新聞
+    enabled: true
+    search_url_template: "https://www.shikoku-np.co.jp/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Regional paper; selector verification pending."
+
+  - site_id: nishinippon
+    site_name: 西日本新聞me
+    enabled: true
+    search_url_template: "https://www.nishinippon.co.jp/search/?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: true
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Next.js app; endpoint responds but Playwright may improve result extraction."
+
+  - site_id: kumamoto_nichi
+    site_name: 熊本日日新聞
+    enabled: true
+    search_url_template: "https://kumanichi.com/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Regional paper; selector verification pending."
+
+  - site_id: ryukyu_shimpo
+    site_name: 琉球新報
+    enabled: true
+    search_url_template: "https://ryukyushimpo.jp/?s={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "WordPress SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: okinawa_times
+    site_name: 沖縄タイムス
+    enabled: true
+    search_url_template: "https://www.okinawatimes.co.jp/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: iwate_np
+    site_name: 岩手日報
+    enabled: true
+    search_url_template: "https://www.iwate-np.co.jp/article/search?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form; some member/pay icons may appear in results."
+
+  - site_id: fukui
+    site_name: 福井新聞
+    enabled: true
+    search_url_template: "https://www.fukuishimbun.co.jp/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: sanyo
+    site_name: 山陽新聞
+    enabled: true
+    search_url_template: "https://www.sanyonews.jp/search/?kw={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form with kw parameter; selector verification pending."
+
+  - site_id: sanin_chuo
+    site_name: 山陰中央新報
+    enabled: true
+    search_url_template: "https://www.sanin-chuo.co.jp/list/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: topics
+    site_name: 徳島新聞
+    enabled: true
+    search_url_template: "https://www.topics.or.jp/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: kochi
+    site_name: 高知新聞
+    enabled: true
+    search_url_template: "https://www.kochinews.co.jp/article/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form with keyword parameter; selector verification pending."
+
+  - site_id: ehime_np
+    site_name: 愛媛新聞
+    enabled: true
+    search_url_template: "https://www.ehime-np.co.jp/search?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: true
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 5
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Search input observed; action needs validation and Playwright may be required."
+
+  - site_id: saga_np
+    site_name: 佐賀新聞
+    enabled: true
+    search_url_template: "https://www.saga-s.co.jp/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "SearchAction-confirmed endpoint; selector verification pending."
+
+  - site_id: nikkan_kogyo
+    site_name: 日刊工業新聞
+    enabled: true
+    search_url_template: "https://www.nikkan.co.jp/articles/search?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: ".resultlist .newsbox"
+    title_selector: ".ttl a"
+    url_selector: ".ttl a"
+    date_selector: ".ttl .date"
+    snippet_selector: "p.txt"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form-confirmed industry newspaper search endpoint; selector verification pending."
+    url_include_patterns:
+      - "https://www.nikkan.co.jp/articles/view/"
+      - "http://www.nikkan.co.jp/articles/view/"
+    require_keyword_in_result: true
+
+  - site_id: kyodo
+    site_name: 共同通信
+    enabled: true
+    search_url_template: "https://www.kyodo.co.jp/?s={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .post, .search-result, li"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a, a"
+    date_selector: "time, .date, .posted-on"
+    snippet_selector: ".entry-summary, p"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Corporate WordPress-style public search; may not cover all wire/news content."
+    url_include_patterns:
+      - "https://www.kyodo.co.jp/"
+    url_exclude_patterns:
+      - "/corp/"
+      - "/books"
+      - "/category/"
+      - "kyodonewsprwire.jp"
+      - "boatrace.jp"
+    require_keyword_in_result: true
+
+  - site_id: nikkei_business
+    site_name: 日経ビジネス
+    enabled: true
+    search_url_template: "https://business.nikkei.com/search/?KEYWORD={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form-confirmed endpoint; some result targets may be registered or paywalled."
+    url_include_patterns:
+      - "https://business.nikkei.com/atcl/"
+    url_exclude_patterns:
+      - "/about/"
+      - "bpreg.nikkeibp.co.jp"
+      - "account.nikkeibp.co.jp"
+    require_keyword_in_result: true
+
+  - site_id: nikkei_xtech
+    site_name: 日経クロステック
+    enabled: true
+    search_url_template: "https://xtech.nikkei.com/search/?KEYWORD={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public form-confirmed endpoint; some gated results may appear."
+    url_include_patterns:
+      - "https://xtech.nikkei.com/atcl/"
+      - "https://xtech.nikkei.com/nxt/"
+    url_exclude_patterns:
+      - "account.nikkeibp.co.jp"
+      - "active.nikkeibp.co.jp"
+      - "business.nikkei.com"
+      - "info.nikkei.com"
+    require_keyword_in_result: true
+
+  - site_id: sbbit
+    site_name: ビジネス+IT
+    enabled: true
+    search_url_template: "https://www.sbbit.jp/search?kwd={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article.crd_itm"
+    title_selector: ".crd_ttl-txt.only_pc, .crd_ttl-txt"
+    url_selector: ".crd_ttl > a[href^='/article/']"
+    date_selector: ".crd_ttl-pubdate"
+    snippet_selector: ".crd_read a"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Public search with kwd parameter; optional category filters are not used in the initial config."
+    url_include_patterns:
+      - "https://www.sbbit.jp/article/"
+    url_exclude_patterns:
+      - "ad.sbbit.jp"
+      - "youtube.com"
+    require_keyword_in_result: true
+
+  - site_id: jiji
+    site_name: 時事ドットコム
+    enabled: false
+    search_url_template: "https://www.jiji.com/jc/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: true
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 5
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Disabled candidate: no clear public search route confirmed; enable only after site-specific verification."
+
+  - site_id: nikkan_jidosha
+    site_name: 日刊自動車新聞 電子版
+    enabled: true
+    search_url_template: "https://www.netdenjd.com/search?keyword={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Automotive trade paper; selector verification pending."
+    url_include_patterns:
+      - "https://www.netdenjd.com/archives/"
+    url_exclude_patterns:
+      - "billing.netdenjd.com"
+      - "fo-njd-mypage.web.app"
+      - "/archives/category/"
+    require_keyword_in_result: true
+
+  - site_id: automotive_news_jp
+    site_name: Automotive News Japan
+    enabled: false
+    search_url_template: "https://www.automotivenews.jp/search?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .search-result, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Disabled after crawl returned connection refused for all keywords; needs endpoint confirmation."
+
+  - site_id: denshi_device
+    site_name: 電波新聞デジタル
+    enabled: true
+    search_url_template: "https://dempa-digital.com/?s={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .post, .search-result, li"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a, a"
+    date_selector: "time, .date, .posted-on"
+    snippet_selector: ".entry-summary, p"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Electronics industry media; WordPress-style search assumed."
+    url_include_patterns:
+      - "https://dempa-digital.com/article/"
+      - "https://dempa-digital.com/?p="
+    url_exclude_patterns:
+      - "#tab-"
+    require_keyword_in_result: true
+
+  - site_id: itmedia
+    site_name: ITmedia
+    enabled: true
+    search_url_template: "https://cse.google.com/cse?cx=000492183644671384608%3A6dff3odaltq&q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    fetch_strategy: google_cse
+    result_item_selector: ".gsc-webResult.gsc-result, .gsc-result"
+    title_selector: ".gs-title a, a.gs-title"
+    url_selector: ".gs-title a, a.gs-title"
+    date_selector: ".gs-snippet"
+    snippet_selector: ".gs-snippet"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    google_cse_lightweight_candidate: true
+    google_cse_cx: "000492183644671384608:6dff3odaltq"
+    google_cse_sort: null
+    google_cse_notes: "Uses cse.js to retrieve the short-lived cse_token, then calls the element/v1 JSONP endpoint directly. Snippet dates are mixed relative/absolute; both explicit-year and Japanese relative snippets are normalized."
+    notes: "Google CSE powered search; fetched through the Google CSE element endpoint."
+
+  - site_id: impress_watch
+    site_name: Impress Watch
+    enabled: false
+    search_url_template: "https://www.watch.impress.co.jp/search/?q={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .searchResult, .article-list li, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Disabled after crawl returned 404 for configured search URL; needs endpoint confirmation."
+
+  - site_id: toyokeizai
+    site_name: 東洋経済オンライン
+    enabled: true
+    search_url_template: "https://toyokeizai.net/list/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .article-list li, .search-result, li"
+    title_selector: "h2 a, h3 a, .title a, a"
+    url_selector: "h2 a, h3 a, .title a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Business media; selector verification pending."
+    url_include_patterns:
+      - "https://toyokeizai.net/articles/-/"
+    url_exclude_patterns:
+      - "biz.toyokeizai.net"
+      - "corp.toyokeizai.net"
+      - "line.me"
+      - "twitter.com"
+      - "facebook.com"
+      - "youtube.com"
+    require_keyword_in_result: true
+
+  - site_id: diamond
+    site_name: ダイヤモンド・オンライン
+    enabled: true
+    search_url_template: "https://diamond.jp/list/search?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: ".article-list-eh > a[href*='/articles/-/']"
+    title_selector: ".title"
+    url_selector: null
+    date_selector: "time.published"
+    snippet_selector: ".summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Search endpoint is /list/search; result cards expose time.published with explicit Japanese dates."
+    url_include_patterns:
+      - "/articles/-/"
+
+  - site_id: president
+    site_name: PRESIDENT Online
+    enabled: true
+    search_url_template: "https://president.jp/search/list?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: ".article-list__item"
+    title_selector: ".article-list__mainTtl a, a[href^='/articles/-/']"
+    url_selector: ".article-list__mainTtl a[href^='/articles/-/'], a[href^='/articles/-/']"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Business magazine media; selector verification pending."
+    url_include_patterns:
+      - "https://president.jp/articles/-/"
+    url_exclude_patterns:
+      - "b.hatena.ne.jp"
+      - "dancyu.jp"
+    require_keyword_in_result: false
+
+  - site_id: ryutsuu_biz
+    site_name: 流通ニュース
+    enabled: true
+    search_url_template: "https://www.ryutsuu.biz/?s={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .post, .search-result, li"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a, a"
+    date_selector: "time, .date, .posted-on"
+    snippet_selector: ".entry-summary, p"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Retail/logistics industry media; WordPress-style search assumed."
+    url_include_patterns:
+      - "https://www.ryutsuu.biz/"
+    url_exclude_patterns:
+      - "form.run"
+      - "the0123.com"
+      - "lnews.jp"
+      - "/page/"
+      - "/company/"
+      - "/seminar/"
+    require_keyword_in_result: true
+
+  - site_id: logistics_today
+    site_name: LOGISTICS TODAY
+    enabled: true
+    search_url_template: "https://www.logi-today.com/?s={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: ".newsList .list"
+    title_selector: ".list-heading p a"
+    url_selector: ".list-heading p a[href^='https://www.logi-today.com/']"
+    date_selector: ".list-heading small"
+    snippet_selector: null
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Logistics industry media; search results are .newsList .list entries."
+    url_include_patterns:
+      - "https://www.logi-today.com/"
+    url_exclude_patterns:
+      - "/category/"
+      - "/newsletter"
+      - "/interview"
+      - "/seminar"
+      - "/advertising"
+    require_keyword_in_result: true
+
+  - site_id: kentsu
+    enabled: true
+    site_name: 建通新聞
+    enabled: true
+    site_name: 建通新聞
+    search_url_template: "https://digital.kentsu.co.jp/articles/artcl_allartcllist?fulltext={query}"
+    query_encoding: "utf-8"
+    requires_playwright: true
+    fetch_strategy: playwright_form
+    form_input_selector: "#keyword-input"
+    form_submit_selector: "form button[type=submit]"
+    form_submit_index: -1
+    result_item_selector: "a[href*='/articles/artcl_rglr/']"
+    title_selector: "h2"
+    url_selector: null
+    date_selector: "time"
+    snippet_selector: null
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Search form at /articles/artcl_allartcllist requires Playwright form submission; result cards expose yearless current-year dates such as 6/18 20:37."
+    url_include_patterns:
+      - "/articles/artcl_rglr/"
+    url_exclude_patterns: []
+    require_keyword_in_result: true
+
+  - site_id: shokuhin_sangyo
+    site_name: 食品産業新聞社ニュースWEB
+    enabled: true
+    search_url_template: "https://www.ssnp.co.jp/?s={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .post, .search-result, li"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a, a"
+    date_selector: "time, .date, .posted-on"
+    snippet_selector: ".entry-summary, p"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Food industry media; WordPress-style search assumed."
+    url_include_patterns:
+      - "https://www.ssnp.co.jp/"
+    url_exclude_patterns:
+      - "/about/"
+      - "/advertisement/"
+      - "/company/"
+      - "/faq/"
+      - "/category/"
+    require_keyword_in_result: true
+
+  - site_id: chemical_daily
+    site_name: 化学工業日報
+    enabled: false
+    search_url_template: "https://www.chemicaldaily.co.jp/?s={query}"
+    query_encoding: "utf-8"
+    requires_playwright: false
+    result_item_selector: "article, .post, .search-result, li"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a, a"
+    date_selector: "time, .date, .posted-on"
+    snippet_selector: ".entry-summary, p"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    notes: "Chemical/pharma industry paper; disabled because no usable public keyword search field/path was confirmed."
+    url_include_patterns:
+      - "https://www.chemicaldaily.co.jp/"
+    url_exclude_patterns:
+      - "/company"
+      - "/mailmagazine"
+      - "/privacy"
+      - "/seminar"
+      - "/90th_anniversary"
+      - "chemicaldaily.com/"
+    require_keyword_in_result: true
+
+  - site_id: denki_shimbun
+    site_name: 電気新聞ウェブサイト
+    enabled: true
+    search_url_template: "https://www.denkishimbun.com/s_result?cof=FORID%3A10&ie=UTF-8&q={query}&sa="
+    query_encoding: "utf-8"
+    requires_playwright: false
+    fetch_strategy: google_cse
+    result_item_selector: ".gsc-webResult.gsc-result, .gsc-result"
+    title_selector: ".gs-title a, a.gs-title"
+    url_selector: ".gs-title a, a.gs-title"
+    date_selector: ".gs-snippet"
+    snippet_selector: ".gs-snippet"
+    rate_limit_seconds: 3
+    user_agent: "news-monitor-bot/0.1"
+    max_pages: 1
+    next_page_selector: null
+    google_cse_lightweight_candidate: true
+    google_cse_cx: "006048404399787863357:x2karccg12w"
+    google_cse_sort: null
+    google_cse_notes: "Uses cse.js to retrieve the short-lived cse_token, then calls the element/v1 JSONP endpoint directly."
+    notes: "Energy/electric power industry paper; Google CSE powered search. Snippet dates are partial, so article date fallback is important."
+    url_include_patterns:
+      - "https://www.denkishimbun.com/archives/"
+      - "https://www.denkishimbun.com/sp/"
+    url_exclude_patterns:
+      - "/sp/tag/"
+      - "denkishimbun.biz"
+      - "digital.denkishimbun.com"
+      - "pixabay.com"
+      - "/advertising"
+    require_keyword_in_result: true

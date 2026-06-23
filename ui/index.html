@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>News Monitor Viewer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>News Monitor</h1>
+          <p id="db-status">SQLiteを読み込み中</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="refresh-button" type="button">更新</button>
+        </div>
+      </header>
+
+      <nav class="tabs" aria-label="view tabs">
+        <button class="tab active" type="button" data-view="results-view">検索結果</button>
+        <button class="tab" type="button" data-view="keywords-view">キーワード一覧</button>
+        <button class="tab" type="button" data-view="requests-view">要望</button>
+        <button class="tab" type="button" data-view="admin-view">管理</button>
+      </nav>
+
+      <main>
+        <section id="results-view" class="view active">
+          <aside class="company-pane">
+            <div class="pane-header">
+              <div>
+                <h2 id="group-list-title">会社</h2>
+                <p id="company-count">0件</p>
+              </div>
+              <select id="company-sort" aria-label="company sort">
+                <option value="name">辞書順</option>
+                <option value="published">掲載日Min順</option>
+                <option value="hit">検索ヒット日Min順</option>
+              </select>
+            </div>
+            <div class="group-type-tabs" aria-label="keyword group type">
+              <button class="group-type-tab active" type="button" data-group-type="company">会社</button>
+              <button class="group-type-tab" type="button" data-group-type="topic">トピック</button>
+            </div>
+            <div class="legend">
+              <span><i class="tone hot"></i>0日</span>
+              <span><i class="tone warm"></i>1-2日</span>
+              <span><i class="tone mild"></i>3-7日</span>
+              <span><i class="tone stale"></i>8日以上</span>
+            </div>
+            <div id="company-list" class="company-list"></div>
+          </aside>
+
+          <section class="article-pane">
+            <div class="pane-header article-header">
+              <div>
+                <h2 id="selected-company">会社を選択</h2>
+                <p id="selected-company-meta">記事一覧を表示します</p>
+              </div>
+              <div class="metric-strip">
+                <div>
+                  <span>掲載日Min</span>
+                  <strong id="selected-published-min">-</strong>
+                </div>
+                <div>
+                  <span>ヒット日Min</span>
+                  <strong id="selected-hit-min">-</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="article-controls">
+              <label class="control-field">
+                <span>記事ソート</span>
+                <select id="article-sort" aria-label="article sort">
+                  <option value="published">掲載日順</option>
+                  <option value="hit">ヒット日順</option>
+                  <option value="site">サイト順</option>
+                </select>
+              </label>
+              <div class="copy-control">
+                <span>Markdownコピー</span>
+                <div class="copy-row">
+                  <input id="copy-days" type="number" min="0" max="3650" value="1" aria-label="copy published days" />
+                  <button id="copy-markdown-button" type="button">直近N日分をコピー</button>
+                </div>
+                <p id="copy-status" class="field-help"></p>
+              </div>
+              <div class="keyword-filter">
+                <div class="filter-heading">
+                  <span>候補キーワードで絞り込み</span>
+                  <button id="clear-keyword-filter" type="button">解除</button>
+                </div>
+                <div id="article-keyword-filter" class="keyword-checklist"></div>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>掲載日</th>
+                    <th>ヒット日</th>
+                    <th>サイト</th>
+                    <th>タイトル</th>
+                    <th>候補キーワード</th>
+                    <th>スニペット</th>
+                  </tr>
+                </thead>
+                <tbody id="article-body">
+                  <tr>
+                    <td colspan="6" class="empty">会社を選択してください</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="keywords-view" class="view split-view">
+          <aside class="keyword-groups">
+            <div class="pane-header">
+              <div>
+                <h2>親キーワード</h2>
+                <p>閲覧専用</p>
+              </div>
+            </div>
+            <div id="keyword-group-list" class="keyword-list"></div>
+          </aside>
+
+          <section class="keyword-candidates">
+            <div class="pane-header">
+              <div>
+                <h2 id="keyword-detail-title">候補キーワード</h2>
+                <p id="keyword-detail-meta">親キーワードを選択してください</p>
+              </div>
+            </div>
+            <div id="candidate-list" class="candidate-list"></div>
+          </section>
+        </section>
+
+        <section id="requests-view" class="view request-view">
+          <div class="request-grid">
+            <section class="panel">
+              <div class="pane-header">
+                <div>
+                  <h2>サイト追加要望</h2>
+                  <p>新聞社・業界メディアなど</p>
+                </div>
+              </div>
+              <form id="site-request-form" class="stack-form">
+                <input id="site-request-name" type="text" placeholder="サイト名" required />
+                <input id="site-request-url" type="url" placeholder="サイトURL" required />
+                <input id="site-requester-name" type="text" placeholder="希望者名" />
+                <input id="site-requester-email" type="email" placeholder="希望者メールアドレス" />
+                <textarea id="site-request-notes" placeholder="補足"></textarea>
+                <button type="submit">要望を登録</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="pane-header">
+                <div>
+                  <h2>キーワード変更要望</h2>
+                  <p>追加・削除は要望として登録</p>
+                </div>
+              </div>
+              <form id="keyword-request-form" class="stack-form">
+                <div class="form-row">
+                  <select id="keyword-request-type">
+                    <option value="add">追加希望</option>
+                    <option value="delete">削除希望</option>
+                  </select>
+                  <select id="keyword-request-group-type">
+                    <option value="company">会社</option>
+                    <option value="topic">トピック</option>
+                  </select>
+                </div>
+                <input id="keyword-request-base" type="text" placeholder="親キーワード" required />
+                <p class="field-help">会社/トピックの選択に応じて、入力欄内の例が切り替わります。</p>
+                <input id="keyword-request-candidate" type="text" placeholder="候補キーワード" />
+                <p class="field-help">親キーワード自体を追加・削除したい場合は、候補キーワード欄は空欄でも可。</p>
+                <input id="keyword-requester-name" type="text" placeholder="希望者名" />
+                <input id="keyword-requester-email" type="email" placeholder="希望者メールアドレス" />
+                <textarea id="keyword-request-reason" placeholder="理由・補足"></textarea>
+                <button type="submit">要望を登録</button>
+              </form>
+            </section>
+          </div>
+
+          <section class="request-list-panel">
+            <div class="pane-header">
+              <div>
+                <h2>要望一覧</h2>
+                <p>ステータスと実装者コメントを確認できます</p>
+              </div>
+            </div>
+            <div id="request-list" class="request-list"></div>
+          </section>
+        </section>
+
+        <section id="admin-view" class="view admin-view">
+          <aside class="keyword-groups">
+            <div class="pane-header">
+              <div>
+                <h2>キーワード管理</h2>
+                <p>実装者向け</p>
+              </div>
+            </div>
+            <form id="add-group-form" class="inline-form">
+              <select id="new-group-type" aria-label="keyword group type">
+                <option value="company">会社</option>
+                <option value="topic">トピック</option>
+              </select>
+              <input id="new-group-input" type="text" placeholder="親キーワードを追加" />
+              <button type="submit">追加</button>
+            </form>
+            <div class="group-type-tabs" aria-label="admin keyword group type">
+              <button class="admin-group-type-tab active" type="button" data-group-type="company">会社</button>
+              <button class="admin-group-type-tab" type="button" data-group-type="topic">トピック</button>
+            </div>
+            <div id="admin-keyword-group-list" class="keyword-list"></div>
+          </aside>
+
+          <section class="admin-detail">
+            <div class="pane-header">
+              <div>
+                <h2 id="admin-keyword-detail-title">候補キーワード</h2>
+                <p id="admin-keyword-detail-meta">親キーワードを選択してください</p>
+              </div>
+            </div>
+            <form id="add-candidate-form" class="inline-form">
+              <input id="new-candidate-input" type="text" placeholder="候補キーワードを追加" disabled />
+              <button id="add-candidate-button" type="submit" disabled>追加</button>
+            </form>
+            <div id="admin-candidate-list" class="candidate-list"></div>
+
+            <div class="pane-header admin-request-header">
+              <div>
+                <h2>サイト状態</h2>
+                <p>最新クロールのエラー・0件・日付欠落を確認</p>
+              </div>
+            </div>
+            <div id="site-health-list" class="request-list site-health-list"></div>
+
+            <div class="pane-header admin-request-header">
+              <div>
+                <h2>要望管理</h2>
+                <p>ステータスとコメントを更新</p>
+              </div>
+            </div>
+            <div id="admin-request-list" class="request-list admin-request-list"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

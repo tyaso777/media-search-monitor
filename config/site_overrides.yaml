@@ -1,0 +1,425 @@
+overrides:
+  - site_id: asahi
+    requires_playwright: true
+    result_item_selector: "#SiteSearchResult li.digital, #SiteSearchResult li.shimbun"
+    title_selector: "a[href*='/articles/']"
+    url_selector: "a[href*='/articles/']"
+    date_selector: null
+    snippet_selector: "p"
+    url_include_patterns: ["/articles/"]
+    notes: "Separate public site-search host; rendered result list verified with Playwright."
+
+  - site_id: mainichi
+    result_item_selector: "#searchresults-list .articlelist > li"
+    title_selector: ".articlelist-title"
+    url_selector: "a"
+    date_selector: ".articletag-date"
+    snippet_selector: ".text-ellipsis-2"
+    url_include_patterns: ["/articles/"]
+    notes: "Public search page; selectors verified against pilot static HTML."
+
+  - site_id: yomiuri
+    result_item_selector: ".search-article-list article"
+    title_selector: ".c-list-title a"
+    url_selector: ".c-list-title a"
+    date_selector: ".c-list-date time[datetime]"
+    snippet_selector: null
+    url_include_patterns: ["/economy/", "/local/", "/culture/", "/sports/", "/national/", "/politics/", "/world/", "/science/", "/medical/", "/editorial/", "/english/"]
+    notes: "Public form-confirmed search endpoint; selectors verified against pilot static HTML."
+
+  - site_id: nikkei
+    parser_strategy: css_selectors
+    date_strategy: css_selector
+    result_item_selector: ".search__result-item"
+    title_selector: ".nui-card__title a"
+    url_selector: ".nui-card__title a[href*='/article/']"
+    date_selector: ".nui-card__meta-pubdate"
+    snippet_selector: ".nui-card__excerpt"
+    url_include_patterns: ["/article/"]
+    notes: "Search result cards use .nui-card__meta-pubdate for published time; title, date, and excerpt are separate anchors."
+
+  - site_id: hokkaido_np
+    result_container_selector: ".main"
+    result_item_selector: ".post_list-type_thm_bg-m .post_item"
+    title_selector: ".post_title a"
+    url_selector: ".post_title a"
+    date_selector: ".post_date"
+    snippet_selector: ".post_text, p"
+    url_include_patterns: ["/article/"]
+    no_results_text: "該当する記事が存在しませんでした"
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: kahoku
+    result_item_selector: ".vr2_articleslist__item"
+    title_selector: "a"
+    url_selector: "a"
+    date_selector: "time, .date"
+    snippet_selector: "p"
+    url_include_patterns: ["/articles/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: iwate_np
+    result_container_selector: ".content-main"
+    result_item_selector: "#article-list > li:not(.hidden)"
+    title_selector: "a"
+    url_selector: "a"
+    date_selector: ".article-time .time"
+    snippet_selector: "p"
+    url_include_patterns: ["/article/"]
+    no_results_text: "該当する記事が見つかりませんでした"
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: toonippo
+    search_url_template: "https://www.toonippo.co.jp/search?fulltext={query}"
+    result_container_selector: "#main-column"
+    result_item_selector: ".article-list li"
+    title_selector: "a"
+    url_selector: "a"
+    date_selector: "time, .date"
+    snippet_selector: "p"
+    url_include_patterns: ["/articles/", "/article/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: chibanippo
+    enabled: false
+    requires_playwright: true
+    search_url_template: "https://www.chibanippo.co.jp/search?keys={query}"
+    result_container_selector: "main .item-list:first-of-type"
+    result_item_selector: "li"
+    title_selector: ".articlelist-title a, a[href*='/articles/']"
+    url_selector: ".articlelist-title a, a[href*='/articles/']"
+    date_selector: ".articlelist-date time[datetime], .articlelist-date"
+    snippet_selector: ".articlelist-body, p"
+    url_include_patterns: ["/articles/", "/prtimes/"]
+    notes: "Disabled: the public search page returns the full article listing for tested keywords such as 日産自動車, even after form submission. Re-enable only after a keyword-filtered endpoint is confirmed."
+
+  - site_id: kanaloco
+    result_item_selector: "section.cont"
+    title_selector: "h2 a, h3 a, a"
+    url_selector: "h2 a, h3 a, a"
+    date_selector: "p.info"
+    snippet_selector: "p, .lead"
+    url_include_patterns: ["/news/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: minyu
+    result_item_selector: "li.column"
+    title_selector: "p.title a"
+    url_selector: "p.title a[href*='/newspack/detail/'], p.title a[href*='/news/detail/']"
+    date_selector: ".status .day"
+    snippet_selector: "p"
+    url_include_patterns: ["/newspack/detail/", "/news/detail/"]
+    notes: "Title-link selector verified against pilot static HTML."
+
+  - site_id: kobe_np
+    result_item_selector: "#search_list li"
+    title_selector: ".search_list_title a"
+    url_selector: ".search_list_title a"
+    date_selector: ".search_list_footer span:first-child"
+    snippet_selector: ".search_list_text"
+    url_include_patterns: ["go.php"]
+    notes: "Search returns redirect URLs; these are stored as search result URLs without following article bodies."
+
+  - site_id: sanyo
+    result_container_selector: ".main"
+    result_item_selector: ".post_list-type_thm_bg-m .post_item"
+    title_selector: ".post_title a, h3 a, a"
+    url_selector: ".post_title a, h3 a, a"
+    date_selector: ".post_date"
+    snippet_selector: "p"
+    url_include_patterns: ["/article/"]
+    url_exclude_patterns: ["?rct="]
+    no_results_text: "該当する記事はありません"
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: ryukyu_shimpo
+    result_item_selector: "main div.border-b.border-b-gray-gainsboro"
+    title_selector: "h4"
+    url_selector: "a[href*='entry-']:has(h4)"
+    date_selector: "span.text-gray-spanish"
+    snippet_selector: ".text-sm-small"
+    url_include_patterns: ["/entry-"]
+    url_exclude_patterns: ["/games/", "lequio-entry", "/pages/", "entry-1089616", "/contact/"]
+    notes: "Anchor-level extraction used because result cards are utility-class based."
+
+  - site_id: kyodo
+    result_container_selector: "main"
+    result_item_selector: "article"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a[href], a[href]"
+    date_selector: "time, .date, .posted-on"
+    snippet_selector: ".entry-summary, p"
+    no_results_text: "検索結果がありません"
+    notes: "Search result extraction is scoped to main article blocks to avoid navigation links."
+
+  - site_id: tokyo_np
+    requires_playwright: false
+    fetch_strategy: google_cse
+    result_item_selector: ".gsc-webResult.gsc-result"
+    title_selector: "a.gs-title[href]"
+    url_selector: "a.gs-title[href]"
+    date_selector: ".gs-snippet"
+    snippet_selector: ".gs-snippet"
+    url_include_patterns: ["/article/"]
+    date_strategy: css_selector
+    google_cse_lightweight_candidate: true
+    google_cse_cx: "ec5a58b709f62d071"
+    google_cse_sort: "date"
+    google_cse_notes: "Uses cse.js to retrieve the short-lived cse_token, then calls the element/v1 JSONP endpoint directly."
+    notes: "Correct search endpoint is /search_result?q=. Results are fetched through the Google CSE element endpoint and converted to CSE result HTML."
+
+  - site_id: chunichi
+    requires_playwright: false
+    fetch_strategy: google_cse
+    result_item_selector: ".gsc-webResult.gsc-result"
+    title_selector: "a.gs-title[href]"
+    url_selector: "a.gs-title[href]"
+    date_selector: ".gs-snippet"
+    snippet_selector: ".gs-snippet"
+    url_include_patterns: ["/article/"]
+    date_strategy: css_selector
+    google_cse_lightweight_candidate: true
+    google_cse_cx: "001739771653228343839:pwqh-bnpw8a"
+    google_cse_sort: null
+    google_cse_notes: "Uses cse.js to retrieve the short-lived cse_token, then calls the element/v1 JSONP endpoint directly."
+    notes: "Correct search endpoint is /search_result?q=. Results are fetched through the Google CSE element endpoint and converted to CSE result HTML."
+
+  - site_id: shimotsuke
+    result_item_selector: "ul.article-category-list > li"
+    title_selector: "a[href*='/articles/-/']"
+    url_selector: "a[href*='/articles/-/']"
+    date_selector: "p.date"
+    snippet_selector: "a"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Search result list verified against pilot static HTML."
+
+  - site_id: fukui
+    result_item_selector: ".main-column .article.clearfix, #main-column .article.clearfix"
+    title_selector: ".info-title a[href*='/articles/-/'], a[href*='/articles/-/']"
+    url_selector: ".info-title a[href*='/articles/-/'], a[href*='/articles/-/']"
+    date_selector: "time, .date"
+    snippet_selector: ".lead, p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Search result article blocks verified against pilot static HTML."
+
+  - site_id: denshi_device
+    result_container_selector: "main, .site-main"
+    result_item_selector: "article"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a[href], a[href]"
+    date_selector: "time, .date, .posted-on"
+    snippet_selector: ".entry-summary, p"
+    no_results_text: "記事は見つかりませんでした"
+    notes: "Search result extraction is scoped to article blocks to avoid navigation/list links."
+
+  - site_id: niigata_nippo
+    result_item_selector: ".l-articles .m-article"
+    title_selector: ".m-article__body a[href*='/articles/-/'], a[href*='/articles/-/']"
+    url_selector: ".m-article__body a[href*='/articles/-/'], a[href*='/articles/-/']"
+    date_selector: ".m-article__meta time[datetime], .m-article__body time[datetime]"
+    snippet_selector: ".m-article__summary, p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Search result article cards verified against pilot static HTML."
+
+  - site_id: kyoto_np
+    result_container_selector: ".l-main, main"
+    result_item_selector: "article"
+    title_selector: "h2 a, h3 a, a"
+    url_selector: "h2 a, h3 a, a"
+    date_selector: ".m-articles-item__info-date[datetime], time[datetime]"
+    snippet_selector: "p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: chugoku_np
+    result_item_selector: ".l-list-block .m-article-card-list > a"
+    title_selector: "h2.m-article-card__title, a[href*='/articles/-/']"
+    url_selector: null
+    date_selector: "time, .date"
+    snippet_selector: ".m-article-card__lead, p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: sanin_chuo
+    result_container_selector: ".l-main, main"
+    result_item_selector: "article"
+    title_selector: "h2 a, h3 a, a"
+    url_selector: "h2 a, h3 a, a"
+    date_selector: "time, .date"
+    snippet_selector: "p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: saga_np
+    result_item_selector: ".l-main .m-articles-item"
+    title_selector: ".m-articles-item__ttl, a[href*='/articles/-/']"
+    url_selector: "a[href*='/articles/-/']"
+    date_selector: "time, .date"
+    snippet_selector: ".m-articles-item__summary, p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: okinawa_times
+    result_item_selector: "main .c-card"
+    title_selector: ".c-card__title, a"
+    url_selector: "a.c-card, a[href*='/articles/-/']"
+    date_selector: "time, .date"
+    snippet_selector: ".c-card__summary, p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: sakigake
+    result_item_selector: ".p-articles__item article"
+    title_selector: ".c-article-module__heading"
+    url_selector: "a[href*='/news/article.jsp']"
+    date_selector: "time, .date"
+    snippet_selector: ".c-article-module__text, p"
+    url_include_patterns: ["/news/article.jsp"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: jomo
+    result_container_selector: ".l-articles"
+    result_item_selector: ".m-article"
+    title_selector: "h2 a, h3 a, a"
+    url_selector: "h2 a, h3 a, a"
+    date_selector: ".m-article__date time[datetime], .m-article__body time[datetime]"
+    snippet_selector: "p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: kochi
+    result_container_selector: ".list_sec"
+    result_item_selector: ".list_sec > .articlesList article"
+    title_selector: "p.tit, a[href*='/article/detail/']"
+    url_selector: "a[href*='/article/detail/']"
+    date_selector: "p.data"
+    snippet_selector: "p"
+    url_include_patterns: ["/article/detail/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: topics
+    search_url_template: "https://www.topics.or.jp/list/search?fulltext={query}"
+    result_container_selector: "main"
+    result_item_selector: "article.m-article-list-default"
+    title_selector: "h2 a, h3 a, a"
+    url_selector: "h2 a, h3 a, a"
+    date_selector: ".m-article-list-default__float time[datetime], time[datetime]"
+    snippet_selector: "p"
+    url_include_patterns: ["/articles/-/"]
+    notes: "Selectors verified against pilot static HTML."
+
+  - site_id: toyokeizai
+    result_container_selector: ".l-main, main"
+    result_item_selector: ".m-article, main article"
+    title_selector: "h2 a, h3 a, .title a, a[href*='/articles/-/']"
+    url_selector: "h2 a[href*='/articles/-/'], h3 a[href*='/articles/-/'], .title a[href*='/articles/-/'], a[href*='/articles/-/']"
+    date_selector: "time, .date"
+    snippet_selector: "p, .summary"
+    url_include_patterns: ["https://toyokeizai.net/articles/-/"]
+    url_exclude_patterns: ["biz.toyokeizai.net", "corp.toyokeizai.net", "line.me", "twitter.com", "facebook.com", "youtube.com"]
+    notes: "Search result extraction is scoped to article result cards under .l-main."
+
+  - site_id: sankei
+    requires_playwright: true
+    result_container_selector: "main section"
+    result_item_selector: "article"
+    title_selector: "h2 a[href*='/article/'], h3 a[href*='/article/'], a[href*='/article/']"
+    url_selector: "h2 a[href*='/article/'], h3 a[href*='/article/'], a[href*='/article/']"
+    date_selector: null
+    snippet_selector: "p"
+    url_include_patterns: ["/article/"]
+    notes: "Search result cards render with JavaScript; selectors verified with Playwright."
+
+  - site_id: ryutsuu_biz
+    result_container_selector: "main"
+    result_item_selector: ".post-list li"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a[href], a[href]"
+    date_selector: "time, .date, .posted-on, span"
+    snippet_selector: ".entry-summary, p"
+    url_exclude_patterns: ["form.run", "the0123.com", "lnews.jp", "/page/", "/company/", "/seminar/", "/article-icon/"]
+    no_results_text: "検索結果はありません"
+    notes: "Search result extraction is scoped to .post-list items to avoid navigation links."
+
+  - site_id: shokuhin_sangyo
+    result_container_selector: ".main-column, main"
+    result_item_selector: "article"
+    title_selector: "h2 a, h3 a, .entry-title a, a"
+    url_selector: "h2 a, h3 a, .entry-title a[href], a[href]"
+    date_selector: "time, .date, .posted-on"
+    snippet_selector: ".entry-summary, p"
+    no_results_text: "検索されたキーワードが含まれる記事は見つかりませんでした"
+    notes: "Search result extraction is scoped to search-result article blocks and returns zero when the site shows its no-result message."
+
+  - site_id: kumamoto_nichi
+    requires_playwright: false
+    fetch_strategy: httpx
+    search_url_template: "https://kumanichi.com/search/cse?search_api_fulltext={query}"
+    result_item_selector: ".y2024-news-list__item"
+    title_selector: "a[href*='/articles/']"
+    url_selector: "a[href*='/articles/']"
+    date_selector: ".y2024-news-list__date-wrap"
+    snippet_selector: "p"
+    url_include_patterns: ["/articles/"]
+    notes: "Search form uses search_api_fulltext; result list is present in static HTTP HTML, so Playwright is not required."
+
+  - site_id: nikkei_business
+    requires_playwright: true
+    result_item_selector: "section.p-articleList_item"
+    title_selector: ".p-articleList_item_title"
+    url_selector: "a.p-articleList_item_link"
+    date_selector: ".p-articleList_item_date"
+    snippet_selector: ".p-articleList_item_description"
+    url_include_patterns: ["/atcl/"]
+    notes: "Search results are rendered by JavaScript; Playwright DOM exposes .p-articleList_item_date values such as 2026.06.19."
+
+  - site_id: nikkei_xtech
+    requires_playwright: true
+    result_item_selector: "li.articleList_item"
+    title_selector: ".articleList_item_title"
+    url_selector: ".articleList_item_title a[href*='/atcl/']"
+    date_selector: "time.articleList_item_date"
+    snippet_selector: ".articleList_item_summary"
+    url_include_patterns: ["/atcl/"]
+    notes: "Search results are rendered by JavaScript; Playwright DOM exposes time.articleList_item_date values such as 2026.06.19."
+
+  - site_id: nishinippon
+    requires_playwright: false
+    fetch_strategy: httpx
+    search_url_template: "https://www.nishinippon.co.jp/search/?q%5Btitle_cont%5D={query}&q%5Bs%5D=opened_at+DESC"
+    result_container_selector: "main"
+    result_item_selector: "article"
+    title_selector: "h2 a[href*='/item/'], a[href*='/item/']"
+    url_selector: "h2 a[href*='/item/'], a[href*='/item/']"
+    date_selector: "h2 + div > span:first-child"
+    snippet_selector: "p"
+    url_include_patterns: ["/item/"]
+    notes: "Search form uses q[title_cont]; result list is present in static HTTP HTML, so Playwright is not required."
+
+  - site_id: ehime_np
+    requires_playwright: true
+    search_url_template: "https://www.ehime-np.co.jp/article/list/?q={query}"
+    result_container_selector: "main"
+    result_item_selector: "a[href*='/article/']"
+    title_selector: null
+    url_selector: null
+    date_selector: null
+    snippet_selector: null
+    url_include_patterns: ["/article/"]
+    notes: "Search form posts to /article/list/ with q; rendered result links verified with Playwright."
+
+  - site_id: shikoku_np
+    enabled: false
+    notes: "Pilot HTTP request returned 403. Disabled until access method and terms are reviewed."
+
+  - site_id: yamagata_np
+    enabled: false
+    notes: "Pilot search URL returned 404. Disabled until the current public search endpoint is confirmed."
+
+  - site_id: shinmai
+    enabled: false
+    notes: "Pilot search URL returned 404. Disabled until the current public search endpoint is confirmed."
+
+  - site_id: shizushin
+    enabled: false
+    notes: "Pilot search URL returned 404/fallback content instead of search results. Disabled until endpoint is confirmed."

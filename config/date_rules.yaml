@@ -1,0 +1,148 @@
+rules:
+  - site_id: asahi
+    date_rule: none
+    rationale: "Search results verified with Playwright do not expose a reliable published date."
+  - site_id: yomiuri
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with an ISO-like year-qualified value."
+  - site_id: mainichi
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026/6/18."
+  - site_id: sankei
+    date_rule: none
+    rationale: "Search result cards do not expose a reliable published date."
+  - site_id: nikkei
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: tokyo_np
+    date_rule: relative_japanese_or_explicit_year
+    rationale: "Correct search endpoint is /search_result?q=. If the result page exposes 3時間前/2日前/yyyy/mm/dd text it is normalized; otherwise article JSON-LD fallback supplies an explicit timestamp."
+  - site_id: chunichi
+    date_rule: relative_japanese_or_explicit_year
+    rationale: "Correct search endpoint is /search_result?q=. Google CSE snippets expose relative dates such as 3日前 and explicit dates such as 2026/06/11."
+  - site_id: hokkaido_np
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026年6月18日."
+  - site_id: kahoku
+    date_rule: url_date_or_explicit_year
+    rationale: "Search results may omit year, but article URLs contain yyyyMMdd; URL date is safer than current-year inference."
+  - site_id: toonippo
+    date_rule: current_day_if_time_only
+    rationale: "Live search result check on 2026-06-21 showed time-only entries such as 14:33更新 matching article page datePublished on the same day; yearless M/D remains unaccepted."
+  - site_id: sakigake
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: minyu
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026/06/18."
+  - site_id: shimotsuke
+    date_rule: current_day_or_current_year_if_yearless
+    rationale: "Live search result checks on 2026-06-21 showed time-only entries such as 5:00 matching same-day article datePublished, yearless M/D entries for current-year pages, and older pages displaying explicit years such as 2025/9/26 and 2007/9/21."
+  - site_id: jomo
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: chibanippo
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: kanaloco
+    date_rule: explicit_year_only
+    rationale: "Only year-qualified dates should be accepted; placeholder date text is ignored."
+  - site_id: niigata_nippo
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: kyoto_np
+    date_rule: machine_datetime
+    rationale: "Uses datetime attributes with year-qualified values."
+  - site_id: kobe_np
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026年05月28日."
+  - site_id: chugoku_np
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: nishinippon
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026/06/19."
+  - site_id: kumamoto_nichi
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026年6月18日."
+  - site_id: ryukyu_shimpo
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026/06/18."
+  - site_id: okinawa_times
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026年6月18日."
+  - site_id: iwate_np
+    date_rule: explicit_year_only
+    rationale: "Search results mix relative strings with year-qualified dates; relative strings are not normalized."
+  - site_id: fukui
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026年6月18日."
+  - site_id: sanyo
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026年6月17日."
+  - site_id: sanin_chuo
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: topics
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: kochi
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026.06.18."
+  - site_id: ehime_np
+    date_rule: none
+    rationale: "Current selector set does not expose a reliable search-result date."
+  - site_id: saga_np
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: nikkan_kogyo
+    date_rule: explicit_year_only
+    rationale: "Search result date text includes year, for example 2026/6/19."
+  - site_id: kyodo
+    date_rule: machine_datetime
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: nikkei_business
+    date_rule: machine_datetime
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: nikkei_xtech
+    date_rule: machine_datetime
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: sbbit
+    date_rule: explicit_year_only
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: nikkan_jidosha
+    date_rule: machine_datetime
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: denshi_device
+    date_rule: machine_datetime
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: itmedia
+    date_rule: relative_japanese_or_explicit_year
+    rationale: "Google CSE has no separate date selector; snippets may include absolute dates or Japanese relative dates, both normalized from the snippet text."
+  - site_id: toyokeizai
+    date_rule: machine_datetime
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: diamond
+    date_rule: explicit_year_only
+    rationale: "Search result cards expose year-qualified Japanese dates in time.published."
+  - site_id: president
+    date_rule: none
+    rationale: "Search result cards do not expose a reliable published date."
+  - site_id: ryutsuu_biz
+    date_rule: explicit_year_only
+    rationale: "Yearless display for older results was not strictly confirmed, so only explicit-year dates are accepted."
+  - site_id: logistics_today
+    date_rule: explicit_year_only
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: kentsu
+    date_rule: current_year_if_yearless
+    rationale: "Search result cards currently expose yearless M/D HH:MM dates for current-year items; year-qualified older dates are accepted when shown."
+  - site_id: shokuhin_sangyo
+    date_rule: machine_datetime
+    rationale: "Configured to accept only year-qualified dates from search results."
+  - site_id: chemical_daily
+    date_rule: none
+    rationale: "Disabled because no usable public keyword search field/path was confirmed."
+  - site_id: denki_shimbun
+    date_rule: explicit_year_only
+    rationale: "Google CSE snippets sometimes expose yyyy/mm/dd dates; missing snippet dates are completed by article page fallback."

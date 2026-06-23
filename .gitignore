@@ -1,0 +1,15 @@
+.venv/
+.uv-cache/
+.npm-cache/
+.pytest_cache/
+node_modules/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+src/*.egg-info/
+data/*sqlite*
+reports/
+outputs/
+work/
+src-tauri/gen/
+src-tauri/target/
