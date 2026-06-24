@@ -53,7 +53,14 @@ uv run playwright install chromium
 
 ### exeビルド担当者
 
-TauriのWindows exeをビルドするPCでは、Node.js/npmとRustが必要です。
+閲覧UIのexeには2種類あります。どちらをビルドするかで必要なソフトウェアが変わります。
+
+| 種類 | 用途 | ビルドに必要なもの | 生成物 |
+|---|---|---|---|
+| Tauri版 | 通常のWindowsデスクトップアプリとして配布したい場合 | Git、Node.js/npm、Rust/Cargo、Tauri Windowsビルド依存 | `news-monitor-viewer.exe`、MSI/NSIS installer |
+| localhost版 | 会社環境でNode.js/npmやTauriを避けたい場合 | Git、Rust/Cargo | `news-monitor-local-viewer.exe` |
+
+Tauri版のWindows exeをビルドするPCでは、Node.js/npmとRustが必要です。
 
 必要:
 
@@ -70,7 +77,9 @@ localhost + 既定ブラウザ版だけをビルドする場合は、Node.js/npm
 
 ### Tauri版
 
-GitHubから取得後、まずNode依存を入れます。
+Tauri版は `src-tauri/` と `ui/` を使ってWindowsアプリを生成します。インストーラーも作る配布向けの方式です。
+
+GitHubから取得後、プロジェクトルートでNode依存を入れます。
 
 ```powershell
 npm install
@@ -105,6 +114,8 @@ npm.cmd run dev
 
 会社環境でNode.js/npmやTauriの扱いが難しい場合はこちらを使います。UI本体は `ui/` を共通利用し、Rust exeがlocalhost APIを提供します。
 
+この方式ではNode.js/npmは不要です。
+
 ```powershell
 cd local-viewer
 cargo build --release
@@ -123,6 +134,7 @@ local-viewer/target/release/news-monitor-local-viewer.exe
 ```
 
 起動すると、空きポートの `http://127.0.0.1:xxxxx/` を立ち上げ、既定ブラウザを自動で開きます。
+右上の `終了` ボタンでlocalhostサーバーを停止できます。その後、ブラウザのタブを閉じてください。
 
 確認・開発用にブラウザ自動起動を止める場合:
 

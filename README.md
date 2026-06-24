@@ -206,14 +206,23 @@ Tauri viewerの管理画面ではサイト別に以下を表示します。
 
 ビルド済みexeを使うだけならNode.js/npm/Rustは不要です。
 
-Tauri版exeをビルドする開発者環境には以下が必要です。
+このプロジェクトには、閲覧UIのexeが2種類あります。
+
+| 種類 | 用途 | ビルドに必要なもの | 利用者側の動き |
+|---|---|---|---|
+| Tauri版 | 通常のWindowsデスクトップアプリとして配布したい場合 | Node.js/npm、Rust/Cargo、Tauri Windowsビルド依存 | exeを起動するとアプリ画面が開く |
+| localhost版 | 会社環境でNode.js/npmやTauriを避けたい場合 | Rust/Cargoのみ | exeを起動するとlocalhostサーバーが立ち上がり、既定ブラウザで画面が開く |
+
+### Tauri版をビルドする場合
+
+Tauri版は `src-tauri/` と `ui/` を使って、Windowsアプリを生成します。開発者PCには以下が必要です。
 
 - Node.js / npm
 - Rust / Cargo
 - TauriのWindowsビルド依存
 - WebView2 Runtime 通常はWindowsに同梱
 
-依存インストール:
+依存インストールはプロジェクトルートで実行します。
 
 ```powershell
 npm install
@@ -233,7 +242,13 @@ src-tauri/target/release/bundle/nsis/News Monitor Viewer_0.1.0_x64-setup.exe
 src-tauri/target/release/bundle/msi/News Monitor Viewer_0.1.0_x64_en-US.msi
 ```
 
-localhost + 既定ブラウザ版だけをビルドする場合はNode.js/npm不要で、Rust/Cargoだけで足ります。
+### localhost版をビルドする場合
+
+localhost版は `local-viewer/` と `ui/` を使って、既定ブラウザで開く軽量exeを生成します。Node.js/npmは不要です。開発者PCには以下だけ必要です。
+
+- Rust / Cargo
+
+ビルド:
 
 ```powershell
 cd local-viewer
@@ -246,10 +261,18 @@ cargo build --release
 local-viewer/target/release/news-monitor-local-viewer.exe
 ```
 
-起動すると `127.0.0.1` の空きポートでサーバーを立ち上げ、既定ブラウザを開きます。ブラウザを自動で開かない確認用途では以下も使えます。
+プロジェクトルートから起動する場合:
 
 ```powershell
-local-viewer/target/release/news-monitor-local-viewer.exe --no-open --port 8765
+.\local-viewer\target\release\news-monitor-local-viewer.exe
+```
+
+起動すると `127.0.0.1` の空きポートでサーバーを立ち上げ、既定ブラウザを開きます。右上の `終了` ボタンでlocalhostサーバーを停止できます。
+
+ブラウザを自動で開かない確認用途では以下も使えます。
+
+```powershell
+.\local-viewer\target\release\news-monitor-local-viewer.exe --no-open --port 8765
 ```
 
 会社利用では、GitHubにはコードと設定を置き、GitHub Actionsまたは開発者PCでexeをビルドして配布する運用が現実的です。利用者各自にnpm/Rustを入れさせる運用は推奨しません。
