@@ -151,11 +151,26 @@
                 </div>
               </div>
               <form id="site-request-form" class="stack-form">
-                <input id="site-request-name" type="text" placeholder="サイト名" required />
-                <input id="site-request-url" type="url" placeholder="サイトURL" required />
-                <input id="site-requester-name" type="text" placeholder="希望者名" />
-                <input id="site-requester-email" type="email" placeholder="希望者メールアドレス" />
-                <textarea id="site-request-notes" placeholder="補足"></textarea>
+                <label class="stack-field">
+                  <span>サイト名</span>
+                  <input id="site-request-name" type="text" placeholder="例: 日本経済新聞" required />
+                </label>
+                <label class="stack-field">
+                  <span>サイトURL</span>
+                  <input id="site-request-url" type="url" placeholder="例: https://www.nikkei.com/" required />
+                </label>
+                <label class="stack-field">
+                  <span>希望者名</span>
+                  <input id="site-requester-name" type="text" placeholder="例: 姓田 名三郎" />
+                </label>
+                <label class="stack-field">
+                  <span>希望者メールアドレス</span>
+                  <input id="site-requester-email" type="email" placeholder="例: sample@example.com" />
+                </label>
+                <label class="stack-field">
+                  <span>補足</span>
+                  <textarea id="site-request-notes" placeholder="例: 検索結果ページがある場合はURLも記載"></textarea>
+                </label>
                 <button type="submit">要望を登録</button>
               </form>
             </section>
@@ -170,7 +185,8 @@
               <form id="keyword-request-form" class="stack-form">
                 <div class="form-row">
                   <select id="keyword-request-type">
-                    <option value="add">追加希望</option>
+                    <option value="add_parent">親キーワード（および子キーワード）を追加</option>
+                    <option value="add_candidate">既存の親キーワードに子キーワードを追加</option>
                     <option value="delete">削除希望</option>
                   </select>
                   <select id="keyword-request-group-type">
@@ -178,13 +194,35 @@
                     <option value="topic">トピック</option>
                   </select>
                 </div>
-                <input id="keyword-request-base" type="text" placeholder="親キーワード" required />
-                <p class="field-help">会社/トピックの選択に応じて、入力欄内の例が切り替わります。</p>
-                <input id="keyword-request-candidate" type="text" placeholder="候補キーワード" />
-                <p class="field-help">親キーワード自体を追加・削除したい場合は、候補キーワード欄は空欄でも可。</p>
-                <input id="keyword-requester-name" type="text" placeholder="希望者名" />
-                <input id="keyword-requester-email" type="email" placeholder="希望者メールアドレス" />
-                <textarea id="keyword-request-reason" placeholder="理由・補足"></textarea>
+                <label id="keyword-request-existing-base-field" class="stack-field">
+                  <span>既存キーワードから選ぶ</span>
+                  <select id="keyword-request-existing-base">
+                    <option value="">既存キーワードを選択</option>
+                  </select>
+                </label>
+                <label class="stack-field">
+                  <span>親キーワード</span>
+                  <input id="keyword-request-base" type="text" placeholder="例: トヨタ自動車" required />
+                </label>
+                <p id="keyword-request-base-status" class="field-help">既存キーワードを選ぶか、新しい親キーワードを入力してください。</p>
+                <label class="stack-field">
+                  <span>子キーワード</span>
+                  <input id="keyword-request-candidate" type="text" list="keyword-request-candidate-options" placeholder="例: トヨタ、TOYOTA" />
+                  <datalist id="keyword-request-candidate-options"></datalist>
+                </label>
+                <p class="field-help">表記ゆれや略称も検索したい場合は子キーワードに入力してください。不要な場合は空欄で構いません。</p>
+                <label class="stack-field">
+                  <span>希望者名</span>
+                  <input id="keyword-requester-name" type="text" placeholder="例: 姓田 名三郎" />
+                </label>
+                <label class="stack-field">
+                  <span>希望者メールアドレス</span>
+                  <input id="keyword-requester-email" type="email" placeholder="例: sample@example.com" />
+                </label>
+                <label class="stack-field">
+                  <span>理由・補足</span>
+                  <textarea id="keyword-request-reason" placeholder="例: 表記ゆれとして検索対象に含めたい"></textarea>
+                </label>
                 <button type="submit">要望を登録</button>
               </form>
             </section>

@@ -61,8 +61,12 @@ const els = {
   keywordRequestForm: document.querySelector("#keyword-request-form"),
   keywordRequestType: document.querySelector("#keyword-request-type"),
   keywordRequestGroupType: document.querySelector("#keyword-request-group-type"),
+  keywordRequestExistingBaseField: document.querySelector("#keyword-request-existing-base-field"),
+  keywordRequestExistingBase: document.querySelector("#keyword-request-existing-base"),
   keywordRequestBase: document.querySelector("#keyword-request-base"),
+  keywordRequestBaseStatus: document.querySelector("#keyword-request-base-status"),
   keywordRequestCandidate: document.querySelector("#keyword-request-candidate"),
+  keywordRequestCandidateOptions: document.querySelector("#keyword-request-candidate-options"),
   keywordRequesterName: document.querySelector("#keyword-requester-name"),
   keywordRequesterEmail: document.querySelector("#keyword-requester-email"),
   keywordRequestReason: document.querySelector("#keyword-request-reason"),
@@ -89,7 +93,13 @@ function groupTypeLabel(groupType) {
 }
 
 function requestTypeLabel(requestType) {
-  return requestType === "delete" ? "削除希望" : "追加希望";
+  const labels = {
+    add: "追加希望",
+    add_parent: "親キーワード追加希望",
+    add_candidate: "子キーワード追加希望",
+    delete: "削除希望",
+  };
+  return labels[requestType] ?? requestType;
 }
 
 function statusLabel(status) {
@@ -120,6 +130,72 @@ function updateKeywordRequestPlaceholders() {
   els.keywordRequestCandidate.placeholder = isTopic
     ? "例: LLM、大規模言語モデル"
     : "例: トヨタ、TOYOTA";
+  renderKeywordRequestOptions();
+}
+
+function keywordRequestGroupsForType() {
+  return state.keywordGroups
+    .filter((group) => group.group_type === els.keywordRequestGroupType.value)
+    .sort((a, b) => compareText(a.base_keyword, b.base_keyword));
+}
+
+function selectedKeywordRequestGroup() {
+  const baseKeyword = els.keywordRequestBase.value.trim();
+  if (!baseKeyword) return null;
+  return keywordRequestGroupsForType().find((group) => group.base_keyword === baseKeyword) ?? null;
+}
+
+function renderKeywordRequestOptions() {
+  const groups = keywordRequestGroupsForType();
+  const selectedBase = els.keywordRequestBase.value.trim();
+  const requestType = els.keywordRequestType.value;
+  const shouldSelectExisting = requestType === "add_candidate" || requestType === "delete";
+  els.keywordRequestExistingBaseField.hidden = !shouldSelectExisting;
+  els.keywordRequestExistingBase.innerHTML = [
+    `<option value="">既存キーワードを選択</option>`,
+    ...groups.map((group) => `<option value="${escapeText(group.base_keyword)}">${escapeText(group.base_keyword)}</option>`),
+  ].join("");
+  els.keywordRequestExistingBase.value = groups.some((group) => group.base_keyword === selectedBase)
+    ? selectedBase
+    : "";
+
+  const selectedGroup = selectedKeywordRequestGroup();
+  els.keywordRequestCandidateOptions.innerHTML = selectedGroup
+    ? selectedGroup.candidates
+        .map((candidate) => `<option value="${escapeText(candidate.candidate_keyword)}"></option>`)
+        .join("")
+    : "";
+
+  const label = groupTypeLabel(els.keywordRequestGroupType.value);
+  if (!els.keywordRequestBase.value.trim()) {
+    els.keywordRequestBaseStatus.textContent =
+      shouldSelectExisting
+        ? `${label}の既存親キーワードを選んでください。`
+        : `新しい${label}の親キーワードを入力してください。既存DB内に同じ親キーワードがある場合は登録できません。`;
+  } else if (selectedGroup) {
+    els.keywordRequestBaseStatus.textContent = shouldSelectExisting
+      ? `既存の${label}「${selectedGroup.base_keyword}」が選択されています。子キーワード欄には既存候補も表示されます。`
+      : `既存DB内に同じ${label}「${selectedGroup.base_keyword}」があります。親キーワード追加ではなく、既存親キーワードへの子キーワード追加を選んでください。`;
+  } else if (shouldSelectExisting) {
+    els.keywordRequestBaseStatus.textContent = `既存の${label}が選ばれていません。先に「既存キーワードから選ぶ」で親キーワードを選択してください。`;
+  } else {
+    els.keywordRequestBaseStatus.textContent = `新しい${label}の親キーワードとして登録希望を出します。`;
+  }
+}
+
+function validateKeywordRequestForm() {
+  const requestType = els.keywordRequestType.value;
+  const selectedGroup = selectedKeywordRequestGroup();
+  const shouldSelectExisting = requestType === "add_candidate" || requestType === "delete";
+  if (requestType === "add_parent" && selectedGroup) {
+    els.keywordRequestBase.setCustomValidity("既存DB内に同じ親キーワードがあります。既存親キーワードへの子キーワード追加を選んでください。");
+  } else if (shouldSelectExisting && !selectedGroup) {
+    els.keywordRequestBase.setCustomValidity("既存キーワードから親キーワードを選択してください。");
+  } else {
+    els.keywordRequestBase.setCustomValidity("");
+  }
+  renderKeywordRequestOptions();
+  return els.keywordRequestForm.reportValidity();
 }
 
 function activeMetric(company) {
@@ -405,6 +481,7 @@ async function loadKeywordTree() {
     state.keywordGroups = await invoke("get_keyword_tree", {});
     renderKeywordGroups();
     renderAdminKeywordGroups();
+    renderKeywordRequestOptions();
     if (!state.selectedKeywordGroup && state.keywordGroups.length > 0) {
       selectKeywordGroup(state.keywordGroups[0].base_keyword_id);
     }
@@ -826,6 +903,7 @@ els.siteRequestForm.addEventListener("submit", async (event) => {
 
 els.keywordRequestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!validateKeywordRequestForm()) return;
   await invoke("create_keyword_change_request", {
     requestType: els.keywordRequestType.value,
     groupType: els.keywordRequestGroupType.value,
@@ -836,10 +914,22 @@ els.keywordRequestForm.addEventListener("submit", async (event) => {
     reason: els.keywordRequestReason.value,
   });
   els.keywordRequestForm.reset();
+  updateKeywordRequestPlaceholders();
   await loadRequests();
 });
 
 els.keywordRequestGroupType.addEventListener("change", updateKeywordRequestPlaceholders);
+els.keywordRequestType.addEventListener("change", renderKeywordRequestOptions);
+els.keywordRequestExistingBase.addEventListener("change", () => {
+  els.keywordRequestBase.value = els.keywordRequestExistingBase.value;
+  els.keywordRequestCandidate.value = "";
+  els.keywordRequestBase.setCustomValidity("");
+  renderKeywordRequestOptions();
+});
+els.keywordRequestBase.addEventListener("input", () => {
+  els.keywordRequestBase.setCustomValidity("");
+  renderKeywordRequestOptions();
+});
 updateKeywordRequestPlaceholders();
 
 loadAll();

@@ -338,6 +338,8 @@ fn normalize_request_status(value: Option<&str>) -> String {
 
 fn normalize_request_type(value: &str) -> String {
     match value.trim().to_ascii_lowercase().as_str() {
+        "add_parent" => "add_parent".to_string(),
+        "add_candidate" => "add_candidate".to_string(),
         "delete" => "delete".to_string(),
         _ => "add".to_string(),
     }
