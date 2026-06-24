@@ -34,6 +34,19 @@ button:hover {
   background: #eef3f8;
 }
 
+.danger-button {
+  border-color: #c85b5b;
+  color: #9f2f2f;
+}
+
+.danger-button:hover {
+  background: #fff0f0;
+}
+
+.server-stopped {
+  opacity: 0.72;
+}
+
 button:disabled,
 input:disabled {
   cursor: not-allowed;

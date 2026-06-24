@@ -1,4 +1,4 @@
-const invoke = window.__TAURI__.core.invoke;
+import { invoke, isLocalViewer } from "./api.js";
 
 const state = {
   sort: "name",
@@ -20,6 +20,7 @@ const state = {
 const els = {
   dbStatus: document.querySelector("#db-status"),
   refreshButton: document.querySelector("#refresh-button"),
+  shutdownButton: document.querySelector("#shutdown-button"),
   groupListTitle: document.querySelector("#group-list-title"),
   companySort: document.querySelector("#company-sort"),
   groupTypeTabs: document.querySelectorAll(".group-type-tab"),
@@ -723,6 +724,22 @@ document.querySelectorAll(".tab").forEach((button) => {
 });
 
 els.refreshButton.addEventListener("click", loadAll);
+
+if (isLocalViewer() && els.shutdownButton) {
+  els.shutdownButton.hidden = false;
+  els.shutdownButton.addEventListener("click", async () => {
+    const ok = window.confirm("News Monitor Local Viewerを終了します。ブラウザのタブも閉じてください。");
+    if (!ok) return;
+    els.dbStatus.textContent = "終了中です";
+    try {
+      await invoke("shutdown_server", {});
+      document.body.classList.add("server-stopped");
+      els.dbStatus.textContent = "サーバーを終了しました。このタブを閉じてください。";
+    } catch (error) {
+      els.dbStatus.textContent = `終了できませんでした: ${error}`;
+    }
+  });
+}
 
 els.companySort.addEventListener("change", async () => {
   state.sort = els.companySort.value;
