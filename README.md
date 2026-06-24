@@ -83,7 +83,13 @@ uv run news-monitor import-config --db data/news_monitor.sqlite --app-config con
 
 ## クロール
 
-通常の全体クロール例:
+### 全サイト取得 Playwrightあり
+
+Playwright対象サイトも含めて取得する通常運用です。初回のみChromiumをインストールしてください。
+
+```powershell
+uv run playwright install chromium
+```
 
 ```powershell
 uv run news-monitor crawl-and-report `
@@ -95,7 +101,21 @@ uv run news-monitor crawl-and-report `
   --max-concurrent-playwright-sites 1
 ```
 
-レポートHTMLだけ再生成する場合:
+### Playwrightなし
+
+Chromiumを使わず、HTTP/Google CSEで取得できるサイトだけを対象にします。Playwright必須サイトはスキップされます。
+
+```powershell
+uv run news-monitor crawl-and-report `
+  --db data/news_monitor.sqlite `
+  --app-config config/app.yaml `
+  --date 2026-06-21 `
+  --max-concurrent-sites 8
+```
+
+### レポートHTMLだけ再生成
+
+クロールせず、既存DBからHTMLレポートだけ再生成する場合:
 
 ```powershell
 uv run news-monitor report --db data/news_monitor.sqlite --date 2026-06-21 --output-dir outputs
