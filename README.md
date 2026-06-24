@@ -18,7 +18,7 @@ docs/setup_and_operation.md
 
 ## 利用者向け
 
-ビルド済みexeでDBを見るだけなら、追加の開発環境は不要です。会社PCでTauri/WebView2やnpmの扱いが難しい場合は、`news-monitor-local-viewer.exe` を使ってください。既定ブラウザで画面を開きます。
+ビルド済みexeでDBを見るだけなら、追加の開発環境は不要です。Tauri/WebView2やnpmを使わない環境では、`news-monitor-local-viewer.exe` を使ってください。既定ブラウザで画面を開きます。
 
 必要なもの:
 
@@ -211,11 +211,11 @@ Tauri viewerの管理画面ではサイト別に以下を表示します。
 | 種類 | 用途 | ビルドに必要なもの | 利用者側の動き |
 |---|---|---|---|
 | Tauri版 | 通常のWindowsデスクトップアプリとして配布したい場合 | Node.js/npm、Rust/Cargo、Tauri Windowsビルド依存 | exeを起動するとアプリ画面が開く |
-| localhost版 | 会社環境でNode.js/npmやTauriを避けたい場合 | Rust/Cargoのみ | exeを起動するとlocalhostサーバーが立ち上がり、既定ブラウザで画面が開く |
+| localhost版 | Node.js/npmやTauriを使わずにビルドしたい場合 | Rust/Cargoのみ | exeを起動するとlocalhostサーバーが立ち上がり、既定ブラウザで画面が開く |
 
 ### Tauri版をビルドする場合
 
-Tauri版は `src-tauri/` と `ui/` を使って、Windowsアプリを生成します。開発者PCには以下が必要です。
+Tauri版は `src-tauri/` と `ui/` を使って、Windowsアプリを生成します。ビルドする環境には以下が必要です。
 
 - Node.js / npm
 - Rust / Cargo
@@ -244,7 +244,7 @@ src-tauri/target/release/bundle/msi/News Monitor Viewer_0.1.0_x64_en-US.msi
 
 ### localhost版をビルドする場合
 
-localhost版は `local-viewer/` と `ui/` を使って、既定ブラウザで開く軽量exeを生成します。Node.js/npmは不要です。開発者PCには以下だけ必要です。
+localhost版は `local-viewer/` と `ui/` を使って、既定ブラウザで開く軽量exeを生成します。Node.js/npmは不要です。ビルドする環境には以下だけ必要です。
 
 - Rust / Cargo
 
@@ -275,7 +275,7 @@ local-viewer/target/release/news-monitor-local-viewer.exe
 .\local-viewer\target\release\news-monitor-local-viewer.exe --no-open --port 8765
 ```
 
-会社利用では、GitHubにはコードと設定を置き、GitHub Actionsまたは開発者PCでexeをビルドして配布する運用が現実的です。利用者各自にnpm/Rustを入れさせる運用は推奨しません。
+GitHubにはコードと設定を置き、GitHub Actionsまたはビルド用PCでexeを作成する運用が現実的です。閲覧だけの環境にnpm/Rustを入れず、ビルド済みexeを使う形にできます。
 
 ## テスト
 
@@ -289,28 +289,22 @@ cargo check --manifest-path local-viewer/Cargo.toml
 
 ## ドキュメント
 
+資料の全体像は [docs/README.md](docs/README.md) に整理しています。
+
 Markdown資料をHTML化する場合:
 
 ```powershell
 uv run python scripts/render_markdown_html.py docs/site_date_availability_review.md
 ```
 
-主要資料:
+主要な入口:
 
-| 資料 | 説明 |
+| 目的 | 資料 |
 |---|---|
-| [setup_and_operation.md](docs/setup_and_operation.md) | GitHubから取得後の必要ソフトウェア、ビルド方法、Playwright有無別クロール、検索ワード更新方法をまとめた運用手順書 |
-| [site_date_availability_review.md](docs/site_date_availability_review.md) | 各サイトについて、検索結果画面で掲載日が取れるか、記事ページfallbackが必要か、相対日付があるか等をまとめたレビュー表 |
-| [site_date_availability_review.html](docs/site_date_availability_review.html) | 掲載日取得可否レビュー表のHTML版。ブラウザで確認しやすい版 |
-| [site_date_availability_matrix.md](docs/site_date_availability_matrix.md) | 掲載日取得可否の全サイト調査結果。機械監査寄りの一覧 |
-| [site_date_rules.md](docs/site_date_rules.md) | サイトごとの掲載日抽出ルール。どのselector/ルールで日付を解釈するかの説明 |
-| [site_date_location_audit.md](docs/site_date_location_audit.md) | 各サイトで掲載日がHTML上のどこに出ているかを調べた監査メモ |
-| [title_trailing_date_audit.md](docs/title_trailing_date_audit.md) | タイトル末尾に日付が出るパターンがあるかを調べた監査メモ |
-| [parser_strategy.md](docs/parser_strategy.md) | 検索結果パーサの設計方針。CSS selector中心、サイト別parserが必要な場合の考え方 |
-| [google_cse_strategy.md](docs/google_cse_strategy.md) | Google CSEをPlaywrightなしで直接HTTP取得する方針・実装メモ |
-| [playwright_reduction_audit.md](docs/playwright_reduction_audit.md) | Playwright依存サイトをHTTP化できるか調査したメモ。HTTP化できたサイト・維持するサイトの判断 |
-| [assumptions.md](docs/assumptions.md) | 初期実装時の前提・スコープ外事項 |
-| [site_notes/initial_media_targets.md](docs/site_notes/initial_media_targets.md) | 初期対象メディアの考え方・候補整理 |
+| docs全体の索引 | [docs/README.md](docs/README.md) |
+| セットアップ、ビルド、クロール、検索ワード更新 | [docs/setup_and_operation.md](docs/setup_and_operation.md) |
+| サイト別の掲載日取得可否 | [docs/site_date_availability_review.md](docs/site_date_availability_review.md) |
+| 掲載日取得ルールの詳細 | [docs/site_date_rules.md](docs/site_date_rules.md) |
 
 ## Git管理方針
 

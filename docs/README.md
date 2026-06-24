@@ -1,0 +1,53 @@
+# Documentation Index
+
+このディレクトリには、運用手順、サイト調査、実装方針、監査メモが混在しています。目的別には以下を見てください。
+
+## まず読む資料
+
+| 資料 | 何が書いてあるか |
+|---|---|
+| [setup_and_operation.md](setup_and_operation.md) | GitHubから取得後に必要なソフトウェア、Tauri版/localhost版のビルド方法、DB初期化、Playwright有無別クロール、検索ワード更新方法 |
+| [../README.md](../README.md) | プロジェクト全体の概要、主要コマンド、Git管理方針 |
+
+## 掲載日取得まわり
+
+| 資料 | 何が書いてあるか |
+|---|---|
+| [site_date_availability_review.md](site_date_availability_review.md) | 各サイトについて、検索結果画面で掲載日が取れるか、記事ページfallbackが必要か、相対日付があるか等をまとめた主レビュー表 |
+| [site_date_availability_review.html](site_date_availability_review.html) | 上記レビュー表のHTML版。ブラウザで確認しやすい版 |
+| [site_date_availability_matrix.md](site_date_availability_matrix.md) | 掲載日取得可否の全サイト調査結果。機械監査寄りの一覧 |
+| [site_date_rules.md](site_date_rules.md) | サイトごとの掲載日抽出ルール。どのselector/ルールで日付を解釈するか |
+| [site_date_location_audit.md](site_date_location_audit.md) | 各サイトで掲載日がHTML上のどこに出ているかを調べた監査メモ |
+| [title_trailing_date_audit.md](title_trailing_date_audit.md) | タイトル末尾に日付が出るパターンがあるかを調べた監査メモ |
+
+掲載日ルールを確認したい場合は、まず [site_date_availability_review.md](site_date_availability_review.md) を見て、実装ルールの詳細は [site_date_rules.md](site_date_rules.md) を見ます。
+
+## クロール・パーサ実装方針
+
+| 資料 | 何が書いてあるか |
+|---|---|
+| [parser_strategy.md](parser_strategy.md) | 検索結果パーサの設計方針。CSS selector中心、サイト別parserが必要な場合の考え方 |
+| [google_cse_strategy.md](google_cse_strategy.md) | Google CSEをPlaywrightなしで直接HTTP取得する方針・実装メモ |
+| [playwright_reduction_audit.md](playwright_reduction_audit.md) | Playwright依存サイトをHTTP化できるか調査したメモ。HTTP化できたサイト・維持するサイトの判断 |
+
+サイト設定や取得方式を変える場合は、この3つを確認します。
+
+## 初期方針・対象メディア
+
+| 資料 | 何が書いてあるか |
+|---|---|
+| [assumptions.md](assumptions.md) | 初期実装時の前提・スコープ外事項 |
+| [site_notes/initial_media_targets.md](site_notes/initial_media_targets.md) | 初期対象メディアの考え方・候補整理 |
+
+## どれを見ればよいか
+
+| 目的 | 見る資料 |
+|---|---|
+| セットアップ、ビルド、クロール方法を知りたい | [setup_and_operation.md](setup_and_operation.md) |
+| Playwrightあり/なしのクロールコマンドを知りたい | [setup_and_operation.md](setup_and_operation.md) |
+| localhost版のビルド方法を知りたい | [setup_and_operation.md](setup_and_operation.md) |
+| 各サイトの日付取得可否を確認したい | [site_date_availability_review.md](site_date_availability_review.md) |
+| 日付抽出ロジックの実装意図を確認したい | [site_date_rules.md](site_date_rules.md) |
+| サイト別selectorやパーサ方針を見たい | [parser_strategy.md](parser_strategy.md) |
+| Google CSE対応方針を見たい | [google_cse_strategy.md](google_cse_strategy.md) |
+| Playwright依存を減らせるかの調査を見たい | [playwright_reduction_audit.md](playwright_reduction_audit.md) |

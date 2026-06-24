@@ -58,7 +58,7 @@ uv run playwright install chromium
 | 種類 | 用途 | ビルドに必要なもの | 生成物 |
 |---|---|---|---|
 | Tauri版 | 通常のWindowsデスクトップアプリとして配布したい場合 | Git、Node.js/npm、Rust/Cargo、Tauri Windowsビルド依存 | `news-monitor-viewer.exe`、MSI/NSIS installer |
-| localhost版 | 会社環境でNode.js/npmやTauriを避けたい場合 | Git、Rust/Cargo | `news-monitor-local-viewer.exe` |
+| localhost版 | Node.js/npmやTauriを使わずにビルドしたい場合 | Git、Rust/Cargo | `news-monitor-local-viewer.exe` |
 
 Tauri版のWindows exeをビルドするPCでは、Node.js/npmとRustが必要です。
 
@@ -77,7 +77,7 @@ localhost + 既定ブラウザ版だけをビルドする場合は、Node.js/npm
 
 ### Tauri版
 
-Tauri版は `src-tauri/` と `ui/` を使ってWindowsアプリを生成します。インストーラーも作る配布向けの方式です。
+Tauri版は `src-tauri/` と `ui/` を使ってWindowsアプリを生成します。インストーラーも作る方式です。
 
 GitHubから取得後、プロジェクトルートでNode依存を入れます。
 
@@ -112,7 +112,7 @@ npm.cmd run dev
 
 ### localhost + 既定ブラウザ版
 
-会社環境でNode.js/npmやTauriの扱いが難しい場合はこちらを使います。UI本体は `ui/` を共通利用し、Rust exeがlocalhost APIを提供します。
+Node.js/npmやTauriを使わずにビルドしたい場合はこちらを使います。UI本体は `ui/` を共通利用し、Rust exeがlocalhost APIを提供します。
 
 この方式ではNode.js/npmは不要です。
 
