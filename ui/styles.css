@@ -347,7 +347,7 @@ input {
 
 .article-controls {
   display: grid;
-  grid-template-columns: 160px 260px 1fr;
+  grid-template-columns: 160px minmax(420px, 520px) 1fr;
   gap: 16px;
   padding: 10px 14px;
   background: #ffffff;
@@ -374,19 +374,114 @@ input {
   width: 100%;
 }
 
-.copy-row {
+.copy-action-grid {
   display: grid;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: minmax(0, max-content) max-content;
+  column-gap: 8px;
+  row-gap: 8px;
+  align-items: center;
+  justify-content: start;
+}
+
+.adj-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid #dbe1e8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #394858;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.copy-label {
+  color: #1d2733;
+}
+
+.copy-count {
+  color: #667381;
+  font-weight: 500;
+}
+
+.copy-inline-icon {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  color: #667381;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.adj-inner {
+  display: inline-grid;
+  grid-template-columns: 30px minmax(32px, auto) 30px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #c8d0d9;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.adj-inner button {
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.adj-inner button:hover {
+  background: #eef3f8;
+}
+
+.adj-inner span {
+  min-width: 30px;
+  padding: 0 8px;
+  text-align: center;
+  font-weight: 650;
+}
+
+.copy-num {
+  color: #1d2733;
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-width: 92px;
+  min-height: 36px;
+  padding: 6px 14px;
+  font-weight: 650;
 }
 
-.copy-row input {
-  width: 100%;
+.copy-btn-primary {
+  border-color: #8fb3da;
+  color: #174f82;
+  background: #f3f8ff;
 }
 
-.copy-row button {
-  padding-left: 8px;
-  padding-right: 8px;
+.copy-btn-primary:hover {
+  background: #e8f2ff;
+}
+
+.copy-button-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .filter-heading {
@@ -454,12 +549,18 @@ input {
 .table-wrap {
   overflow: auto;
   min-height: 0;
+  padding: 12px 14px 14px;
 }
 
 table {
   width: 100%;
-  border-collapse: collapse;
+  border: 1px solid #d7dee7;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 8px;
   table-layout: fixed;
+  overflow: hidden;
+  background: #ffffff;
 }
 
 th,

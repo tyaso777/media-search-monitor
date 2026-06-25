@@ -33,7 +33,16 @@ const els = {
   selectedHitMin: document.querySelector("#selected-hit-min"),
   articleSort: document.querySelector("#article-sort"),
   copyDays: document.querySelector("#copy-days"),
+  copyDaysDecrease: document.querySelector("#copy-days-decrease"),
+  copyDaysIncrease: document.querySelector("#copy-days-increase"),
+  copyDaysLabel: document.querySelector("#copy-days-label"),
   copyMarkdownButton: document.querySelector("#copy-markdown-button"),
+  copyTopRecords: document.querySelector("#copy-top-records"),
+  copyTopRecordsDecrease: document.querySelector("#copy-top-records-decrease"),
+  copyTopRecordsIncrease: document.querySelector("#copy-top-records-increase"),
+  copyTopRecordsLabel: document.querySelector("#copy-top-records-label"),
+  copyTopRecordsButton: document.querySelector("#copy-top-records-button"),
+  copyTargetCount: document.querySelector("#copy-target-count"),
   copyStatus: document.querySelector("#copy-status"),
   articleKeywordFilter: document.querySelector("#article-keyword-filter"),
   clearKeywordFilter: document.querySelector("#clear-keyword-filter"),
@@ -77,7 +86,7 @@ const els = {
 
 function daysLabel(days) {
   if (days === null || days === undefined) return "-";
-  return `${days}日`;
+  return `${days}日前`;
 }
 
 function toneForDays(days) {
@@ -361,6 +370,7 @@ function renderArticleKeywordFilter() {
 
   if (!options.length) {
     els.articleKeywordFilter.innerHTML = `<span class="filter-empty">候補キーワードなし</span>`;
+    updateCopyPreview();
     return;
   }
 
@@ -383,6 +393,7 @@ function renderArticleKeywordFilter() {
     });
     els.articleKeywordFilter.appendChild(label);
   }
+  updateCopyPreview();
 }
 
 function filteredArticleRows() {
@@ -397,19 +408,55 @@ function filteredArticleRows() {
 }
 
 function rowsForMarkdownCopy() {
-  const days = Number.parseInt(els.copyDays.value, 10);
-  const maxDays = Number.isFinite(days) ? Math.max(0, days) : 1;
+  const maxDays = currentCopyDays();
   return filteredArticleRows().filter(
     (row) => row.published_days !== null && row.published_days !== undefined && row.published_days <= maxDays,
   );
 }
 
-function buildMarkdown(rows) {
-  const title = state.selectedCompany?.base_keyword || "検索結果";
+function rowsForTopRecordsMarkdownCopy() {
+  return filteredArticleRows().slice(0, currentCopyTopRecords());
+}
+
+function currentCopyDays() {
   const days = Number.parseInt(els.copyDays.value, 10);
-  const maxDays = Number.isFinite(days) ? Math.max(0, days) : 1;
+  return Number.isFinite(days) ? Math.max(0, Math.min(3650, days)) : 1;
+}
+
+function setCopyDays(days) {
+  const nextDays = Math.max(0, Math.min(3650, days));
+  els.copyDays.value = String(nextDays);
+  updateCopyPreview();
+}
+
+function currentCopyTopRecords() {
+  const count = Number.parseInt(els.copyTopRecords.value, 10);
+  return Number.isFinite(count) ? Math.max(1, Math.min(5000, count)) : 5;
+}
+
+function setCopyTopRecords(count) {
+  const nextCount = Math.max(1, Math.min(5000, count));
+  els.copyTopRecords.value = String(nextCount);
+  updateCopyPreview();
+}
+
+function updateCopyPreview() {
+  const days = currentCopyDays();
+  const rows = rowsForMarkdownCopy();
+  const topRecords = currentCopyTopRecords();
+  els.copyDays.value = String(days);
+  els.copyTopRecords.value = String(topRecords);
+  els.copyDaysLabel.textContent = String(days);
+  els.copyTopRecordsLabel.textContent = String(topRecords);
+  els.copyTargetCount.textContent = `（対象 ${rows.length}件）`;
+  els.copyDaysDecrease.disabled = days <= 0;
+  els.copyTopRecordsDecrease.disabled = topRecords <= 1;
+}
+
+function buildMarkdown(rows, heading) {
+  const title = state.selectedCompany?.base_keyword || "検索結果";
   const lines = [
-    `## ${markdownEscape(title)} 掲載日直近${maxDays}日分`,
+    `## ${markdownEscape(title)} ${markdownEscape(heading)}`,
     "",
     "| 掲載日 | サイト | タイトル | 候補キーワード | スニペット |",
     "|---|---|---|---|---|",
@@ -430,7 +477,23 @@ async function copyRecentMarkdown() {
     els.copyStatus.textContent = "対象記事がありません";
     return;
   }
-  const markdown = buildMarkdown(rows);
+  const markdown = buildMarkdown(rows, `掲載日直近${currentCopyDays()}日分`);
+  try {
+    await navigator.clipboard.writeText(markdown);
+    els.copyStatus.textContent = `${rows.length}件をコピーしました`;
+  } catch (error) {
+    els.copyStatus.textContent = `コピーできませんでした: ${error}`;
+  }
+}
+
+async function copyTopRecordsMarkdown() {
+  const topRecords = currentCopyTopRecords();
+  const rows = rowsForTopRecordsMarkdownCopy();
+  if (!rows.length) {
+    els.copyStatus.textContent = "対象記事がありません";
+    return;
+  }
+  const markdown = buildMarkdown(rows, `上位${topRecords}レコード`);
   try {
     await navigator.clipboard.writeText(markdown);
     els.copyStatus.textContent = `${rows.length}件をコピーしました`;
@@ -444,6 +507,7 @@ function renderArticles() {
   if (!rows.length) {
     const message = state.articleRows.length ? "条件に合う記事がありません" : "記事がありません";
     els.articleBody.innerHTML = `<tr><td colspan="6" class="empty">${message}</td></tr>`;
+    updateCopyPreview();
     return;
   }
   els.articleBody.innerHTML = rows
@@ -474,6 +538,7 @@ function renderArticles() {
       }
     });
   });
+  updateCopyPreview();
 }
 
 async function loadKeywordTree() {
@@ -855,6 +920,23 @@ els.articleSort.addEventListener("change", () => {
 });
 
 els.copyMarkdownButton.addEventListener("click", copyRecentMarkdown);
+els.copyTopRecordsButton.addEventListener("click", copyTopRecordsMarkdown);
+els.copyDaysDecrease.addEventListener("click", () => {
+  setCopyDays(currentCopyDays() - 1);
+  els.copyStatus.textContent = "";
+});
+els.copyDaysIncrease.addEventListener("click", () => {
+  setCopyDays(currentCopyDays() + 1);
+  els.copyStatus.textContent = "";
+});
+els.copyTopRecordsDecrease.addEventListener("click", () => {
+  setCopyTopRecords(currentCopyTopRecords() - 1);
+  els.copyStatus.textContent = "";
+});
+els.copyTopRecordsIncrease.addEventListener("click", () => {
+  setCopyTopRecords(currentCopyTopRecords() + 1);
+  els.copyStatus.textContent = "";
+});
 
 els.clearKeywordFilter.addEventListener("click", () => {
   state.selectedArticleKeywords = new Set();
