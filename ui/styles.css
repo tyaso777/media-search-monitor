@@ -128,7 +128,12 @@ main {
 }
 
 #results-view {
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 10px 360px 1fr;
+}
+
+#results-view::before {
+  content: "";
+  background: #f5f6f8;
 }
 
 #keywords-view {
@@ -149,8 +154,13 @@ main {
 .admin-detail,
 .article-pane {
   min-height: 0;
-  border-right: 1px solid #dbe1e8;
+  border-right: 1px solid #c9d3df;
   background: #ffffff;
+}
+
+.company-pane {
+  background: #f3f6f9;
+  border-right-color: #b9c5d1;
 }
 
 .article-pane,
@@ -174,6 +184,35 @@ main {
 
 .article-header {
   background: #ffffff;
+  justify-content: flex-start;
+  min-height: 58px;
+}
+
+.article-title-block {
+  min-width: 0;
+  width: 100%;
+}
+
+.article-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.article-title-line h2 {
+  color: #1d2733;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.article-title-separator {
+  width: 1px;
+  height: 16px;
+  background: #c9d3df;
+  flex: 0 0 auto;
 }
 
 select,
@@ -202,7 +241,7 @@ input {
   gap: 6px;
   padding: 10px 14px;
   border-bottom: 1px solid #edf1f5;
-  background: #ffffff;
+  background: #f3f6f9;
 }
 
 .group-type-tab.active,
@@ -279,6 +318,7 @@ input {
 .company-row {
   cursor: pointer;
   border-left: 5px solid #cfd7df;
+  background: #fbfcfd;
 }
 
 .company-row:hover,
@@ -318,31 +358,45 @@ input {
 
 .metric-strip {
   display: flex;
-  gap: 10px;
+  gap: 6px;
+  align-items: center;
 }
 
-.metric-strip div,
+.metric-badge,
 .metric-pill {
-  min-width: 74px;
-  padding: 5px 8px;
-  border: 1px solid #dbe1e8;
-  border-radius: 6px;
-  background: #f8fafc;
-  text-align: center;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px 7px;
+  border: 1px solid #d7dee7;
+  border-radius: 4px;
+  background: #f3f6f9;
+  color: #667381;
+  text-align: left;
 }
 
 .metric-strip span,
 .metric-pill span {
-  display: block;
+  display: inline;
   color: #667381;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .metric-strip strong,
 .metric-pill strong {
-  display: block;
-  margin-top: 2px;
-  font-size: 14px;
+  display: inline;
+  margin-top: 0;
+  color: #1d2733;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#selected-company-meta {
+  color: #8b98a7;
+  font-size: 12px;
+  margin-left: 2px;
+  white-space: nowrap;
 }
 
 .article-controls {
