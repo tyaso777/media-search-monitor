@@ -171,6 +171,7 @@ ID列は空欄で構いません。import時に安定したUUID系IDが内部生
 fetch strategy:
 
 - `httpx`: 静的HTML取得
+- `truststore`: OS証明書ストアを使ったHTTPS証明書検証
 - `google_cse`: Google CSEの内部リクエストをHTTPで取得
 - `playwright`: JavaScript描画後のHTMLを取得
 - `playwright_form`: Playwrightでフォーム送信して取得

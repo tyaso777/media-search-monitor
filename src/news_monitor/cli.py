@@ -12,6 +12,23 @@ from news_monitor.crawler import Crawler
 from news_monitor.reporter import generate_report
 
 
+LOGGER = logging.getLogger(__name__)
+
+
+def _enable_system_trust_store() -> None:
+    """Use the OS certificate store for HTTPS when truststore is installed."""
+
+    try:
+        import truststore
+    except ImportError:
+        return
+
+    try:
+        truststore.inject_into_ssl()
+    except Exception as exc:  # pragma: no cover - environment dependent
+        LOGGER.warning("Could not enable system trust store: %s", exc)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
 
@@ -79,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     logging.basicConfig(level=getattr(logging, str(args.log_level).upper()))
+    _enable_system_trust_store()
 
     if args.command == "init-db":
         with database.connect(args.db) as conn:
