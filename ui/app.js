@@ -21,6 +21,7 @@ const els = {
   dbStatus: document.querySelector("#db-status"),
   refreshButton: document.querySelector("#refresh-button"),
   shutdownButton: document.querySelector("#shutdown-button"),
+  shutdownOverlay: document.querySelector(".shutdown-overlay"),
   groupListTitle: document.querySelector("#group-list-title"),
   companySort: document.querySelector("#company-sort"),
   groupTypeTabs: document.querySelectorAll(".group-type-tab"),
@@ -876,6 +877,7 @@ if (isLocalViewer() && els.shutdownButton) {
     try {
       await invoke("shutdown_server", {});
       document.body.classList.add("server-stopped");
+      els.shutdownOverlay?.setAttribute("aria-hidden", "false");
       els.dbStatus.textContent = "サーバーを終了しました。このタブを閉じてください。";
     } catch (error) {
       els.dbStatus.textContent = `終了できませんでした: ${error}`;
