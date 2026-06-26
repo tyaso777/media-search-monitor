@@ -9,6 +9,19 @@ const state = {
   selectedCompany: null,
   articleRows: [],
   selectedArticleKeywords: new Set(),
+  copyMode: "recent",
+  columnFilters: {
+    site: new Set(),
+    keyword: new Set(),
+    title: "",
+    snippet: "",
+    publishedDays: null,
+    hitDays: null,
+  },
+  columnSort: {
+    column: null,
+    direction: "asc",
+  },
   keywordGroups: [],
   selectedKeywordGroup: null,
   adminSelectedKeywordGroup: null,
@@ -32,22 +45,20 @@ const els = {
   selectedCompanyMeta: document.querySelector("#selected-company-meta"),
   selectedPublishedMin: document.querySelector("#selected-published-min"),
   selectedHitMin: document.querySelector("#selected-hit-min"),
-  articleSort: document.querySelector("#article-sort"),
+  copyModeButtons: document.querySelectorAll(".copy-mode-button"),
+  copyModeLabel: document.querySelector("#copy-mode-label"),
+  copyUnitLabel: document.querySelector("#copy-unit-label"),
   copyDays: document.querySelector("#copy-days"),
-  copyDaysDecrease: document.querySelector("#copy-days-decrease"),
-  copyDaysIncrease: document.querySelector("#copy-days-increase"),
-  copyDaysLabel: document.querySelector("#copy-days-label"),
+  copyValueDecrease: document.querySelector("#copy-value-decrease"),
+  copyValueIncrease: document.querySelector("#copy-value-increase"),
+  copyValueLabel: document.querySelector("#copy-value-label"),
   copyMarkdownButton: document.querySelector("#copy-markdown-button"),
   copyTopRecords: document.querySelector("#copy-top-records"),
-  copyTopRecordsDecrease: document.querySelector("#copy-top-records-decrease"),
-  copyTopRecordsIncrease: document.querySelector("#copy-top-records-increase"),
-  copyTopRecordsLabel: document.querySelector("#copy-top-records-label"),
-  copyTopRecordsButton: document.querySelector("#copy-top-records-button"),
   copyTargetCount: document.querySelector("#copy-target-count"),
   copyStatus: document.querySelector("#copy-status"),
-  articleKeywordFilter: document.querySelector("#article-keyword-filter"),
-  clearKeywordFilter: document.querySelector("#clear-keyword-filter"),
   articleBody: document.querySelector("#article-body"),
+  columnFilterButtons: document.querySelectorAll(".column-filter-button"),
+  columnFilterPopover: document.querySelector("#column-filter-popover"),
   keywordGroupList: document.querySelector("#keyword-group-list"),
   candidateList: document.querySelector("#candidate-list"),
   keywordDetailTitle: document.querySelector("#keyword-detail-title"),
@@ -247,6 +258,12 @@ function markdownEscape(value) {
 }
 
 function articleComparator(a, b) {
+  if (state.columnSort.column) {
+    const direction = state.columnSort.direction === "desc" ? -1 : 1;
+    const result = compareArticleColumn(a, b, state.columnSort.column);
+    if (result) return result * direction;
+  }
+
   if (state.articleSort === "hit") {
     return (
       compareOptionalDays(a.hit_days, b.hit_days) ||
@@ -272,6 +289,50 @@ function articleComparator(a, b) {
     compareText(a.site_name, b.site_name) ||
     compareText(a.title, b.title)
   );
+}
+
+function compareArticleColumn(a, b, column) {
+  if (column === "published") {
+    return compareOptionalDays(a.published_days, b.published_days) || compareText(b.published_date, a.published_date);
+  }
+  if (column === "hit") {
+    return compareOptionalDays(a.hit_days, b.hit_days) || compareText(b.first_hit_at, a.first_hit_at);
+  }
+  if (column === "site") return compareText(a.site_name, b.site_name);
+  if (column === "title") return compareText(a.title, b.title);
+  if (column === "keyword") return compareText(a.candidate_keywords, b.candidate_keywords);
+  if (column === "snippet") return compareText(a.snippet, b.snippet);
+  return 0;
+}
+
+function resetColumnFilters() {
+  state.columnFilters = {
+    site: new Set(),
+    keyword: new Set(),
+    title: "",
+    snippet: "",
+    publishedDays: null,
+    hitDays: null,
+  };
+  state.columnSort = { column: null, direction: "asc" };
+}
+
+function isColumnFilterActive(column) {
+  if (state.columnSort.column === column) return true;
+  const filters = state.columnFilters;
+  if (column === "published") return filters.publishedDays !== null;
+  if (column === "hit") return filters.hitDays !== null;
+  if (column === "site") return filters.site.size > 0;
+  if (column === "keyword") return filters.keyword.size > 0 || state.selectedArticleKeywords.size > 0;
+  if (column === "title") return Boolean(filters.title.trim());
+  if (column === "snippet") return Boolean(filters.snippet.trim());
+  return false;
+}
+
+function updateColumnFilterIndicators() {
+  els.columnFilterButtons.forEach((button) => {
+    button.classList.toggle("active", isColumnFilterActive(button.dataset.column));
+  });
 }
 
 async function loadAll() {
@@ -334,6 +395,8 @@ async function selectCompany(baseKeywordId) {
   state.selectedCompany = company;
   state.articleRows = [];
   state.selectedArticleKeywords = new Set();
+  resetColumnFilters();
+  closeColumnFilterPopover();
   renderCompanies();
   els.selectedCompany.textContent = company.base_keyword;
   els.selectedCompanyMeta.textContent = `記事 ${company.article_count} / サイト ${company.site_count}`;
@@ -364,47 +427,54 @@ function articleKeywordOptions() {
   return [...counts.entries()].sort((a, b) => compareText(a[0], b[0]));
 }
 
+function siteOptions() {
+  const counts = new Map();
+  for (const row of state.articleRows) {
+    counts.set(row.site_name, (counts.get(row.site_name) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => compareText(a[0], b[0]));
+}
+
 function renderArticleKeywordFilter() {
-  const options = articleKeywordOptions();
-  els.articleKeywordFilter.innerHTML = "";
-  els.clearKeywordFilter.disabled = state.selectedArticleKeywords.size === 0;
-
-  if (!options.length) {
-    els.articleKeywordFilter.innerHTML = `<span class="filter-empty">候補キーワードなし</span>`;
-    updateCopyPreview();
-    return;
-  }
-
-  for (const [keyword, count] of options) {
-    const label = document.createElement("label");
-    label.className = "check-pill";
-    label.innerHTML = `
-      <input type="checkbox" value="${escapeText(keyword)}" ${state.selectedArticleKeywords.has(keyword) ? "checked" : ""} />
-      <span>${escapeText(keyword)}</span>
-      <em>${count}</em>
-    `;
-    label.querySelector("input").addEventListener("change", (event) => {
-      if (event.target.checked) {
-        state.selectedArticleKeywords.add(keyword);
-      } else {
-        state.selectedArticleKeywords.delete(keyword);
-      }
-      renderArticleKeywordFilter();
-      renderArticles();
-    });
-    els.articleKeywordFilter.appendChild(label);
-  }
+  state.columnFilters.keyword = new Set(state.selectedArticleKeywords);
   updateCopyPreview();
 }
 
 function filteredArticleRows() {
   const selected = state.selectedArticleKeywords;
-  const rows =
-    selected.size === 0
-      ? [...state.articleRows]
-      : state.articleRows.filter((row) =>
-          splitCandidateKeywords(row.candidate_keywords).some((keyword) => selected.has(keyword)),
-        );
+  const filters = state.columnFilters;
+  const titleText = filters.title.trim().toLocaleLowerCase();
+  const snippetText = filters.snippet.trim().toLocaleLowerCase();
+  const rows = state.articleRows.filter((row) => {
+    if (
+      selected.size > 0 &&
+      !splitCandidateKeywords(row.candidate_keywords).some((keyword) => selected.has(keyword))
+    ) {
+      return false;
+    }
+    if (filters.site.size > 0 && !filters.site.has(row.site_name)) return false;
+    if (
+      filters.keyword.size > 0 &&
+      !splitCandidateKeywords(row.candidate_keywords).some((keyword) => filters.keyword.has(keyword))
+    ) {
+      return false;
+    }
+    if (titleText && !String(row.title || "").toLocaleLowerCase().includes(titleText)) return false;
+    if (snippetText && !String(row.snippet || "").toLocaleLowerCase().includes(snippetText)) return false;
+    if (
+      filters.publishedDays !== null &&
+      (row.published_days === null || row.published_days === undefined || row.published_days > filters.publishedDays)
+    ) {
+      return false;
+    }
+    if (
+      filters.hitDays !== null &&
+      (row.hit_days === null || row.hit_days === undefined || row.hit_days > filters.hitDays)
+    ) {
+      return false;
+    }
+    return true;
+  });
   return rows.sort(articleComparator);
 }
 
@@ -442,16 +512,187 @@ function setCopyTopRecords(count) {
 }
 
 function updateCopyPreview() {
+  const isRecentMode = state.copyMode === "recent";
+  const rows = isRecentMode ? rowsForMarkdownCopy() : rowsForTopRecordsMarkdownCopy();
+  const value = isRecentMode ? currentCopyDays() : currentCopyTopRecords();
+  const minValue = isRecentMode ? 0 : 1;
   const days = currentCopyDays();
-  const rows = rowsForMarkdownCopy();
   const topRecords = currentCopyTopRecords();
   els.copyDays.value = String(days);
   els.copyTopRecords.value = String(topRecords);
-  els.copyDaysLabel.textContent = String(days);
-  els.copyTopRecordsLabel.textContent = String(topRecords);
+  els.copyValueLabel.textContent = String(value);
+  els.copyModeLabel.textContent = isRecentMode ? "直近掲載日で" : "上位レコードで";
+  els.copyUnitLabel.textContent = isRecentMode ? "日以内をコピー" : "件をコピー";
   els.copyTargetCount.textContent = `（対象 ${rows.length}件）`;
-  els.copyDaysDecrease.disabled = days <= 0;
-  els.copyTopRecordsDecrease.disabled = topRecords <= 1;
+  els.copyValueDecrease.disabled = value <= minValue;
+  els.copyModeButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.copyMode === state.copyMode);
+  });
+}
+
+function closeColumnFilterPopover() {
+  if (!els.columnFilterPopover) return;
+  els.columnFilterPopover.hidden = true;
+  els.columnFilterPopover.innerHTML = "";
+}
+
+function openColumnFilterPopover(column, anchor) {
+  if (!els.columnFilterPopover) return;
+  const rect = anchor.getBoundingClientRect();
+  els.columnFilterPopover.innerHTML = renderColumnFilterPopover(column);
+  els.columnFilterPopover.hidden = false;
+  els.columnFilterPopover.style.left = `${Math.min(rect.left, window.innerWidth - 310)}px`;
+  els.columnFilterPopover.style.top = `${rect.bottom + 6}px`;
+  bindColumnFilterPopover(column);
+}
+
+function renderColumnFilterPopover(column) {
+  const sortButtons = `
+    <div class="column-filter-section">
+      <button type="button" data-action="sort-asc">昇順</button>
+      <button type="button" data-action="sort-desc">降順</button>
+    </div>
+  `;
+  if (column === "published" || column === "hit") {
+    const value = column === "published" ? state.columnFilters.publishedDays : state.columnFilters.hitDays;
+    return `
+      <div class="column-filter-title">${column === "published" ? "掲載日" : "ヒット日"}</div>
+      ${sortButtons}
+      <label class="column-filter-field">
+        <span>直近N日以内</span>
+        <input data-role="days-filter" type="number" min="0" max="3650" value="${value ?? ""}" placeholder="例: 7" />
+      </label>
+      <div class="column-filter-actions">
+        <button type="button" data-action="apply-days">適用</button>
+        <button type="button" data-action="clear">クリア</button>
+      </div>
+    `;
+  }
+  if (column === "site" || column === "keyword") {
+    const options = column === "site" ? siteOptions() : articleKeywordOptions();
+    const selected = column === "site" ? state.columnFilters.site : state.columnFilters.keyword;
+    const list = options
+      .map(
+        ([value, count]) => `
+          <label class="column-filter-check">
+            <input type="checkbox" value="${escapeText(value)}" ${selected.has(value) ? "checked" : ""} />
+            <span>${escapeText(value)}</span>
+            <em>${count}</em>
+          </label>
+        `,
+      )
+      .join("");
+    return `
+      <div class="column-filter-title">${column === "site" ? "サイト" : "候補キーワード"}</div>
+      ${sortButtons}
+      <label class="column-filter-field">
+        <span>候補検索</span>
+        <input data-role="option-search" type="search" placeholder="絞り込み" />
+      </label>
+      <div class="column-filter-toggle-row">
+        <button type="button" data-action="check-all">全件チェック</button>
+        <button type="button" data-action="uncheck-all">全解除</button>
+      </div>
+      <div class="column-filter-checklist">${list || '<span class="filter-empty">候補なし</span>'}</div>
+      <div class="column-filter-actions">
+        <button type="button" data-action="apply-checks">適用</button>
+        <button type="button" data-action="clear">クリア</button>
+      </div>
+    `;
+  }
+  const textValue = column === "title" ? state.columnFilters.title : state.columnFilters.snippet;
+  return `
+    <div class="column-filter-title">${column === "title" ? "タイトル" : "スニペット"}</div>
+    ${sortButtons}
+    <label class="column-filter-field">
+      <span>含まれる文字</span>
+      <input data-role="text-filter" type="search" value="${escapeText(textValue)}" placeholder="例: 携帯" />
+    </label>
+    <div class="column-filter-actions">
+      <button type="button" data-action="apply-text">適用</button>
+      <button type="button" data-action="clear">クリア</button>
+    </div>
+  `;
+}
+
+function bindColumnFilterPopover(column) {
+  const popover = els.columnFilterPopover;
+  popover.querySelector('[data-action="sort-asc"]')?.addEventListener("click", () => {
+    state.columnSort = { column, direction: "asc" };
+    renderArticles();
+    closeColumnFilterPopover();
+  });
+  popover.querySelector('[data-action="sort-desc"]')?.addEventListener("click", () => {
+    state.columnSort = { column, direction: "desc" };
+    renderArticles();
+    closeColumnFilterPopover();
+  });
+  popover.querySelector('[data-action="apply-days"]')?.addEventListener("click", () => {
+    const input = popover.querySelector('[data-role="days-filter"]');
+    const parsed = Number.parseInt(input.value, 10);
+    const value = Number.isFinite(parsed) ? Math.max(0, Math.min(3650, parsed)) : null;
+    if (column === "published") state.columnFilters.publishedDays = value;
+    if (column === "hit") state.columnFilters.hitDays = value;
+    renderArticles();
+    closeColumnFilterPopover();
+  });
+  popover.querySelector('[data-action="apply-text"]')?.addEventListener("click", () => {
+    const input = popover.querySelector('[data-role="text-filter"]');
+    if (column === "title") state.columnFilters.title = input.value;
+    if (column === "snippet") state.columnFilters.snippet = input.value;
+    renderArticles();
+    closeColumnFilterPopover();
+  });
+  popover.querySelector('[data-action="apply-checks"]')?.addEventListener("click", () => {
+    const values = new Set(
+      [...popover.querySelectorAll('.column-filter-check input:checked')].map((input) => input.value),
+    );
+    if (column === "site") state.columnFilters.site = values;
+    if (column === "keyword") {
+      state.columnFilters.keyword = values;
+      state.selectedArticleKeywords = new Set(values);
+      renderArticleKeywordFilter();
+    }
+    renderArticles();
+    closeColumnFilterPopover();
+  });
+  popover.querySelector('[data-action="check-all"]')?.addEventListener("click", () => {
+    popover.querySelectorAll(".column-filter-check:not([hidden]) input").forEach((input) => {
+      input.checked = true;
+    });
+  });
+  popover.querySelector('[data-action="uncheck-all"]')?.addEventListener("click", () => {
+    popover.querySelectorAll(".column-filter-check:not([hidden]) input").forEach((input) => {
+      input.checked = false;
+    });
+  });
+  popover.querySelector('[data-action="clear"]')?.addEventListener("click", () => {
+    if (column === "published") state.columnFilters.publishedDays = null;
+    if (column === "hit") state.columnFilters.hitDays = null;
+    if (column === "site") state.columnFilters.site = new Set();
+    if (column === "keyword") {
+      state.columnFilters.keyword = new Set();
+      state.selectedArticleKeywords = new Set();
+      renderArticleKeywordFilter();
+    }
+    if (column === "title") state.columnFilters.title = "";
+    if (column === "snippet") state.columnFilters.snippet = "";
+    if (state.columnSort.column === column) state.columnSort = { column: null, direction: "asc" };
+    renderArticles();
+    closeColumnFilterPopover();
+  });
+  popover.querySelector('[data-role="option-search"]')?.addEventListener("input", (event) => {
+    const query = event.target.value.trim().toLocaleLowerCase();
+    popover.querySelectorAll(".column-filter-check").forEach((label) => {
+      label.hidden = query && !label.textContent.toLocaleLowerCase().includes(query);
+    });
+  });
+  popover.querySelector('[data-role="text-filter"]')?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") popover.querySelector('[data-action="apply-text"]')?.click();
+  });
+  popover.querySelector('[data-role="days-filter"]')?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") popover.querySelector('[data-action="apply-days"]')?.click();
+  });
 }
 
 function buildMarkdown(rows, heading) {
@@ -503,8 +744,17 @@ async function copyTopRecordsMarkdown() {
   }
 }
 
+async function copyCurrentMarkdown() {
+  if (state.copyMode === "top") {
+    await copyTopRecordsMarkdown();
+  } else {
+    await copyRecentMarkdown();
+  }
+}
+
 function renderArticles() {
   const rows = filteredArticleRows();
+  updateColumnFilterIndicators();
   if (!rows.length) {
     const message = state.articleRows.length ? "条件に合う記事がありません" : "記事がありません";
     els.articleBody.innerHTML = `<tr><td colspan="6" class="empty">${message}</td></tr>`;
@@ -896,6 +1146,8 @@ els.groupTypeTabs.forEach((button) => {
     state.selectedCompany = null;
     state.articleRows = [];
     state.selectedArticleKeywords = new Set();
+    resetColumnFilters();
+    closeColumnFilterPopover();
     els.groupTypeTabs.forEach((tab) => tab.classList.toggle("active", tab === button));
     els.selectedCompany.textContent = `${groupTypeLabel(state.groupType)}を選択`;
     els.selectedCompanyMeta.textContent = "記事一覧を表示します";
@@ -916,34 +1168,53 @@ els.adminGroupTypeTabs.forEach((button) => {
   });
 });
 
-els.articleSort.addEventListener("change", () => {
-  state.articleSort = els.articleSort.value;
-  renderArticles();
+els.columnFilterButtons.forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isSameColumn =
+      !els.columnFilterPopover.hidden && els.columnFilterPopover.dataset.column === button.dataset.column;
+    if (isSameColumn) {
+      closeColumnFilterPopover();
+      return;
+    }
+    els.columnFilterPopover.dataset.column = button.dataset.column;
+    openColumnFilterPopover(button.dataset.column, button);
+  });
 });
 
-els.copyMarkdownButton.addEventListener("click", copyRecentMarkdown);
-els.copyTopRecordsButton.addEventListener("click", copyTopRecordsMarkdown);
-els.copyDaysDecrease.addEventListener("click", () => {
-  setCopyDays(currentCopyDays() - 1);
-  els.copyStatus.textContent = "";
-});
-els.copyDaysIncrease.addEventListener("click", () => {
-  setCopyDays(currentCopyDays() + 1);
-  els.copyStatus.textContent = "";
-});
-els.copyTopRecordsDecrease.addEventListener("click", () => {
-  setCopyTopRecords(currentCopyTopRecords() - 1);
-  els.copyStatus.textContent = "";
-});
-els.copyTopRecordsIncrease.addEventListener("click", () => {
-  setCopyTopRecords(currentCopyTopRecords() + 1);
-  els.copyStatus.textContent = "";
+document.addEventListener("pointerdown", (event) => {
+  if (
+    els.columnFilterPopover?.hidden === false &&
+    !els.columnFilterPopover.contains(event.target) &&
+    !event.target.closest(".column-filter-button")
+  ) {
+    closeColumnFilterPopover();
+  }
 });
 
-els.clearKeywordFilter.addEventListener("click", () => {
-  state.selectedArticleKeywords = new Set();
-  renderArticleKeywordFilter();
-  renderArticles();
+els.copyMarkdownButton.addEventListener("click", copyCurrentMarkdown);
+els.copyModeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    state.copyMode = button.dataset.copyMode;
+    els.copyStatus.textContent = "";
+    updateCopyPreview();
+  });
+});
+els.copyValueDecrease.addEventListener("click", () => {
+  if (state.copyMode === "top") {
+    setCopyTopRecords(currentCopyTopRecords() - 1);
+  } else {
+    setCopyDays(currentCopyDays() - 1);
+  }
+  els.copyStatus.textContent = "";
+});
+els.copyValueIncrease.addEventListener("click", () => {
+  if (state.copyMode === "top") {
+    setCopyTopRecords(currentCopyTopRecords() + 1);
+  } else {
+    setCopyDays(currentCopyDays() + 1);
+  }
+  els.copyStatus.textContent = "";
 });
 
 els.addGroupForm.addEventListener("submit", async (event) => {

@@ -75,35 +75,23 @@
             </div>
 
             <div class="article-controls">
-              <label class="control-field">
-                <span>記事ソート</span>
-                <select id="article-sort" aria-label="article sort">
-                  <option value="published">掲載日順</option>
-                  <option value="hit">ヒット日順</option>
-                  <option value="site">サイト順</option>
-                </select>
-              </label>
               <div class="copy-control">
-                <span>Markdownコピー</span>
+                <span class="copy-control-title">Markdownコピー</span>
                 <input id="copy-days" type="hidden" value="1" />
                 <input id="copy-top-records" type="hidden" value="5" />
                 <div class="copy-action-grid">
+                  <div class="copy-mode-toggle" aria-label="Markdown copy mode">
+                    <button class="copy-mode-button active" type="button" data-copy-mode="recent">直近掲載日で</button>
+                    <button class="copy-mode-button" type="button" data-copy-mode="top">上位レコードで</button>
+                  </div>
                   <div class="adj-group">
-                    <svg class="copy-inline-icon" aria-hidden="true" viewBox="0 0 24 24">
-                      <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
-                      <path d="M16 3v4" />
-                      <path d="M8 3v4" />
-                      <path d="M4 11h16" />
-                      <path d="M11 15h1" />
-                      <path d="M12 15v3" />
-                    </svg>
-                    <span class="copy-label">掲載日直近</span>
+                    <span id="copy-mode-label" class="copy-label">直近掲載日で</span>
                     <div class="adj-inner">
-                      <button id="copy-days-decrease" type="button" aria-label="コピー対象日数を減らす">−</button>
-                      <span id="copy-days-label" class="copy-num">1</span>
-                      <button id="copy-days-increase" type="button" aria-label="コピー対象日数を増やす">＋</button>
+                      <button id="copy-value-decrease" type="button" aria-label="コピー対象数を減らす">−</button>
+                      <span id="copy-value-label" class="copy-num">1</span>
+                      <button id="copy-value-increase" type="button" aria-label="コピー対象数を増やす">＋</button>
                     </div>
-                    <span class="copy-label">日以内をコピー</span>
+                    <span id="copy-unit-label" class="copy-label">日以内をコピー</span>
                     <span id="copy-target-count" class="copy-count">（対象 0件）</span>
                   </div>
                   <button id="copy-markdown-button" class="copy-btn copy-btn-primary" type="button">
@@ -113,39 +101,8 @@
                     </svg>
                     コピー
                   </button>
-                  <div class="adj-group">
-                    <svg class="copy-inline-icon" aria-hidden="true" viewBox="0 0 24 24">
-                      <path d="M9 6h11" />
-                      <path d="M9 12h11" />
-                      <path d="M9 18h11" />
-                      <path d="M5 6v.01" />
-                      <path d="M5 12v.01" />
-                      <path d="M5 18v.01" />
-                    </svg>
-                    <span class="copy-label">上位</span>
-                    <div class="adj-inner">
-                      <button id="copy-top-records-decrease" type="button" aria-label="コピー対象件数を減らす">−</button>
-                      <span id="copy-top-records-label" class="copy-num">5</span>
-                      <button id="copy-top-records-increase" type="button" aria-label="コピー対象件数を増やす">＋</button>
-                    </div>
-                    <span class="copy-label">件をコピー</span>
-                  </div>
-                  <button id="copy-top-records-button" class="copy-btn" type="button">
-                    <svg class="copy-button-icon" aria-hidden="true" viewBox="0 0 24 24">
-                      <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z" />
-                      <path d="M4.012 16.737a2 2 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />
-                    </svg>
-                    コピー
-                  </button>
                 </div>
                 <p id="copy-status" class="field-help"></p>
-              </div>
-              <div class="keyword-filter">
-                <div class="filter-heading">
-                  <span>候補キーワードで絞り込み</span>
-                  <button id="clear-keyword-filter" type="button">解除</button>
-                </div>
-                <div id="article-keyword-filter" class="keyword-checklist"></div>
               </div>
             </div>
 
@@ -153,12 +110,12 @@
               <table>
                 <thead>
                   <tr>
-                    <th>掲載日</th>
-                    <th>ヒット日</th>
-                    <th>サイト</th>
-                    <th>タイトル</th>
-                    <th>候補キーワード</th>
-                    <th>スニペット</th>
+                    <th><button class="column-filter-button" type="button" data-column="published">掲載日 <span>▼</span></button></th>
+                    <th><button class="column-filter-button" type="button" data-column="hit">ヒット日 <span>▼</span></button></th>
+                    <th><button class="column-filter-button" type="button" data-column="site">サイト <span>▼</span></button></th>
+                    <th><button class="column-filter-button" type="button" data-column="title">タイトル <span>▼</span></button></th>
+                    <th><button class="column-filter-button" type="button" data-column="keyword">候補キーワード <span>▼</span></button></th>
+                    <th><button class="column-filter-button" type="button" data-column="snippet">スニペット <span>▼</span></button></th>
                   </tr>
                 </thead>
                 <tbody id="article-body">
@@ -168,6 +125,7 @@
                 </tbody>
               </table>
             </div>
+            <div id="column-filter-popover" class="column-filter-popover" hidden></div>
           </section>
         </section>
 
