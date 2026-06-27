@@ -8,6 +8,7 @@ const state = {
   companies: [],
   selectedCompany: null,
   articleRows: [],
+  viewerMetadata: null,
   selectedArticleKeywords: new Set(),
   copyMode: "recent",
   columnFilters: {
@@ -40,6 +41,7 @@ const els = {
   groupTypeTabs: document.querySelectorAll(".group-type-tab"),
   adminGroupTypeTabs: document.querySelectorAll(".admin-group-type-tab"),
   companyCount: document.querySelector("#company-count"),
+  viewerCacheStatus: document.querySelector("#viewer-cache-status"),
   companyList: document.querySelector("#company-list"),
   selectedCompany: document.querySelector("#selected-company"),
   selectedCompanyMeta: document.querySelector("#selected-company-meta"),
@@ -248,6 +250,19 @@ function compareText(a, b) {
   return String(a ?? "").localeCompare(String(b ?? ""), "ja");
 }
 
+function formatCacheDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function markdownEscape(value) {
   return String(value ?? "")
     .replaceAll("\\", "\\\\")
@@ -349,19 +364,41 @@ async function loadStats() {
 }
 
 async function loadCompanies() {
+  els.groupListTitle.textContent = groupTypeLabel(state.groupType);
+  els.companyCount.textContent = "読み込み中";
+  els.viewerCacheStatus.textContent = "一覧データ: 読み込み中";
+  els.companyList.innerHTML = `<div class="company-loading">一覧データを読み込み中</div>`;
   try {
-    state.companies = await invoke("get_keyword_summaries", {
-      sort: state.sort,
-      groupType: state.groupType,
-    });
-    els.groupListTitle.textContent = groupTypeLabel(state.groupType);
+    const [companies, metadata] = await Promise.all([
+      invoke("get_keyword_summaries", {
+        sort: state.sort,
+        groupType: state.groupType,
+      }),
+      invoke("get_viewer_metadata", {}),
+    ]);
+    state.companies = companies;
+    state.viewerMetadata = metadata;
     els.companyCount.textContent = `${state.companies.length}件`;
+    els.viewerCacheStatus.textContent = metadata?.rebuilt_at
+      ? `一覧データ更新: ${formatCacheDateTime(metadata.rebuilt_at)}`
+      : "一覧データ: 未作成";
     renderCompanies();
     if (!state.selectedCompany && state.companies.length > 0) {
       await selectCompany(state.companies[0].base_keyword_id);
+    } else if (
+      state.selectedCompany &&
+      !state.companies.some((company) => company.base_keyword_id === state.selectedCompany.base_keyword_id)
+    ) {
+      state.selectedCompany = null;
+      state.articleRows = [];
+      if (state.companies.length > 0) {
+        await selectCompany(state.companies[0].base_keyword_id);
+      }
     }
   } catch (error) {
     els.companyList.innerHTML = `<div class="error">${escapeText(error)}</div>`;
+    els.companyCount.textContent = "取得失敗";
+    els.viewerCacheStatus.textContent = "一覧データ: 取得失敗";
   }
 }
 

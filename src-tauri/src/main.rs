@@ -25,6 +25,13 @@ fn get_keyword_summaries(
 }
 
 #[tauri::command]
+fn get_viewer_metadata(
+    db_path: Option<String>,
+) -> Result<Option<viewer_core::ViewerMetadata>, String> {
+    viewer_core::get_viewer_metadata(db_path)
+}
+
+#[tauri::command]
 fn get_company_results(
     db_path: Option<String>,
     base_keyword_id: String,
@@ -169,6 +176,7 @@ fn main() {
             get_stats,
             get_companies,
             get_keyword_summaries,
+            get_viewer_metadata,
             get_company_results,
             get_keyword_tree,
             add_keyword_group,

@@ -246,6 +246,12 @@ uv run news-monitor report `
   --output-dir outputs
 ```
 
+Viewerの会社/トピック一覧はDB内の表示用集計キャッシュを優先して読みます。`crawl` / `crawl-and-report` の後は自動更新されます。既存DBに対して手動で再作成する場合:
+
+```powershell
+uv run news-monitor rebuild-viewer-cache --db data/news_monitor.sqlite
+```
+
 ## 5. 検索ワードのアップデート方法
 
 検索ワードは `config/keywords.csv` で管理します。

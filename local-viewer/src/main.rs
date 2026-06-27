@@ -51,7 +51,9 @@ impl Options {
             match arg.as_str() {
                 "--no-open" => no_open = true,
                 "--port" => {
-                    let value = args.next().ok_or_else(|| "--port requires a value".to_string())?;
+                    let value = args
+                        .next()
+                        .ok_or_else(|| "--port requires a value".to_string())?;
                     port = Some(
                         value
                             .parse::<u16>()
@@ -111,10 +113,18 @@ fn read_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
     let header_end = header_end.ok_or_else(|| "invalid HTTP request".to_string())?;
     let headers_text = String::from_utf8_lossy(&buffer[..header_end]).to_string();
     let mut lines = headers_text.lines();
-    let request_line = lines.next().ok_or_else(|| "missing request line".to_string())?;
+    let request_line = lines
+        .next()
+        .ok_or_else(|| "missing request line".to_string())?;
     let mut request_parts = request_line.split_whitespace();
     let method = request_parts.next().unwrap_or_default().to_string();
-    let path = request_parts.next().unwrap_or("/").split('?').next().unwrap_or("/").to_string();
+    let path = request_parts
+        .next()
+        .unwrap_or("/")
+        .split('?')
+        .next()
+        .unwrap_or("/")
+        .to_string();
 
     let mut content_length = 0_usize;
     for line in lines {
@@ -179,6 +189,7 @@ fn dispatch(command: &str, params: &Value) -> Result<Value, String> {
             opt_string(params, "sort", "sort"),
             opt_string(params, "groupType", "group_type"),
         )),
+        "get_viewer_metadata" => to_value(viewer_core::get_viewer_metadata(db_path)),
         "get_company_results" => to_value(viewer_core::get_company_results(
             db_path,
             req_string(params, "baseKeywordId", "base_keyword_id")?,
@@ -309,7 +320,11 @@ fn method_not_allowed() -> String {
 }
 
 fn json_response(status: u16, payload: Value) -> String {
-    let reason = if status == 200 { "OK" } else { "Internal Server Error" };
+    let reason = if status == 200 {
+        "OK"
+    } else {
+        "Internal Server Error"
+    };
     response(
         status,
         reason,

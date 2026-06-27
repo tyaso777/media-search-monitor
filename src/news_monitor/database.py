@@ -6,6 +6,7 @@ import json
 import sqlite3
 import time
 import uuid
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
@@ -13,6 +14,7 @@ from news_monitor.models import KeywordCandidate, ParsedResult, SiteConfig
 from news_monitor.url_utils import canonicalize_url
 
 T = TypeVar("T")
+JST = timezone(timedelta(hours=9))
 
 
 def connect(db_path: Path, busy_timeout_seconds: int = 30) -> sqlite3.Connection:
@@ -174,6 +176,34 @@ def init_db(conn: sqlite3.Connection) -> None:
             implementer_comment TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS viewer_group_summary (
+            group_id TEXT PRIMARY KEY,
+            group_name TEXT NOT NULL,
+            group_type TEXT NOT NULL DEFAULT 'company',
+            article_count INTEGER NOT NULL DEFAULT 0,
+            site_count INTEGER NOT NULL DEFAULT 0,
+            latest_published_date TEXT,
+            latest_hit_at TEXT,
+            published_min_days INTEGER,
+            hit_min_days INTEGER,
+            sort_name TEXT NOT NULL,
+            rebuilt_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_viewer_group_summary_type_name
+            ON viewer_group_summary(group_type, sort_name);
+        CREATE INDEX IF NOT EXISTS idx_viewer_group_summary_type_published
+            ON viewer_group_summary(group_type, published_min_days, sort_name);
+        CREATE INDEX IF NOT EXISTS idx_viewer_group_summary_type_hit
+            ON viewer_group_summary(group_type, hit_min_days, sort_name);
+        CREATE TABLE IF NOT EXISTS viewer_metadata (
+            cache_name TEXT PRIMARY KEY,
+            rebuilt_at TEXT NOT NULL,
+            source_hit_count INTEGER NOT NULL DEFAULT 0,
+            source_item_count INTEGER NOT NULL DEFAULT 0,
+            row_count INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL,
+            error_message TEXT
         );
         """
     )
@@ -602,3 +632,108 @@ def query_all(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) 
     """Return all rows for a query."""
 
     return list(conn.execute(sql, params))
+
+
+def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) -> None:
+    """Rebuild pre-aggregated tables used by the desktop and localhost viewers."""
+
+    rebuilt_at = (now or datetime.now(JST)).isoformat(timespec="seconds")
+    today = _date_from_datetime(now) if now is not None else datetime.now(JST).date()
+    rows = conn.execute(
+        """
+        SELECT
+            kg.base_keyword_id AS group_id,
+            kg.base_keyword AS group_name,
+            COALESCE(kg.group_type, 'company') AS group_type,
+            COUNT(DISTINCT i.result_item_id) AS article_count,
+            COUNT(DISTINCT i.site_id) AS site_count,
+            MAX(NULLIF(i.published_date, '')) AS latest_published_date,
+            MAX(NULLIF(h.first_seen_at, '')) AS latest_hit_at
+        FROM keyword_groups kg
+        LEFT JOIN search_result_hits h ON h.base_keyword_id = kg.base_keyword_id
+        LEFT JOIN search_result_items i ON i.result_item_id = h.result_item_id
+        WHERE kg.enabled = 1
+        GROUP BY kg.base_keyword_id, kg.base_keyword, COALESCE(kg.group_type, 'company')
+        """
+    ).fetchall()
+
+    conn.execute("DELETE FROM viewer_group_summary")
+    for row in rows:
+        latest_published = row["latest_published_date"]
+        latest_hit_at = row["latest_hit_at"]
+        conn.execute(
+            """
+            INSERT INTO viewer_group_summary (
+                group_id, group_name, group_type, article_count, site_count,
+                latest_published_date, latest_hit_at, published_min_days, hit_min_days,
+                sort_name, rebuilt_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row["group_id"],
+                row["group_name"],
+                row["group_type"],
+                int(row["article_count"] or 0),
+                int(row["site_count"] or 0),
+                latest_published,
+                latest_hit_at,
+                _days_since(_parse_published_date(latest_published), today),
+                _days_since(_parse_iso_date_prefix(latest_hit_at), today),
+                row["group_name"],
+                rebuilt_at,
+            ),
+        )
+
+    source_hit_count = conn.execute("SELECT COUNT(*) AS n FROM search_result_hits").fetchone()["n"]
+    source_item_count = conn.execute("SELECT COUNT(*) AS n FROM search_result_items").fetchone()["n"]
+    conn.execute(
+        """
+        INSERT INTO viewer_metadata (
+            cache_name, rebuilt_at, source_hit_count, source_item_count,
+            row_count, status, error_message
+        )
+        VALUES ('group_summary', ?, ?, ?, ?, 'success', NULL)
+        ON CONFLICT(cache_name) DO UPDATE SET
+            rebuilt_at = excluded.rebuilt_at,
+            source_hit_count = excluded.source_hit_count,
+            source_item_count = excluded.source_item_count,
+            row_count = excluded.row_count,
+            status = excluded.status,
+            error_message = excluded.error_message
+        """,
+        (rebuilt_at, source_hit_count, source_item_count, len(rows)),
+    )
+    conn.commit()
+
+
+def _date_from_datetime(value: datetime) -> date:
+    """Return the local date for a datetime, preserving naive values as-is."""
+
+    if value.tzinfo is None:
+        return value.date()
+    return value.astimezone(JST).date()
+
+
+def _parse_published_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value.strip(), "%Y/%m/%d").date()
+    except ValueError:
+        return None
+
+
+def _parse_iso_date_prefix(value: str | None) -> date | None:
+    if not value or len(value) < 10:
+        return None
+    try:
+        return datetime.strptime(value[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _days_since(value: date | None, today: date) -> int | None:
+    if value is None:
+        return None
+    return (today - value).days

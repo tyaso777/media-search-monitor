@@ -121,6 +121,12 @@ uv run news-monitor crawl-and-report `
 uv run news-monitor report --db data/news_monitor.sqlite --date 2026-06-21 --output-dir outputs
 ```
 
+Viewerの会社/トピック一覧を高速に表示するため、クロール後はDB内の表示用集計キャッシュも更新されます。既存DBに対して手動で再作成する場合:
+
+```powershell
+uv run news-monitor rebuild-viewer-cache --db data/news_monitor.sqlite
+```
+
 `crawl` と `crawl-and-report` は以下の絞り込みもできます。
 
 - `--site-id`

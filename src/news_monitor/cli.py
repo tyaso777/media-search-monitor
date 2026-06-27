@@ -61,6 +61,9 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--date", required=True)
     report.add_argument("--output-dir", type=Path)
 
+    rebuild_viewer_cache = subparsers.add_parser("rebuild-viewer-cache")
+    rebuild_viewer_cache.add_argument("--db", required=True, type=Path)
+
     crawl_report = subparsers.add_parser("crawl-and-report")
     crawl_report.add_argument("--db", required=True, type=Path)
     crawl_report.add_argument("--app-config", required=True, type=Path)
@@ -129,12 +132,19 @@ def main(argv: list[str] | None = None) -> int:
                 max_sites=args.max_sites,
                 max_keywords=args.max_keywords,
             ).crawl()
+            database.rebuild_viewer_cache(conn)
         return 0
 
     if args.command == "report":
         with database.connect(args.db) as conn:
             output_dir = args.output_dir or Path("reports")
             print(generate_report(conn, args.date, output_dir))
+        return 0
+
+    if args.command == "rebuild-viewer-cache":
+        with database.connect(args.db) as conn:
+            database.init_db(conn)
+            database.rebuild_viewer_cache(conn)
         return 0
 
     if args.command == "crawl-and-report":
@@ -154,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_sites=args.max_sites,
                 max_keywords=args.max_keywords,
             ).crawl()
+            database.rebuild_viewer_cache(conn)
             print(generate_report(conn, args.date, Path(app_config.report.output_dir)))
         return 0
 

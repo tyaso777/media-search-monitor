@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from news_monitor import database
 from news_monitor.config import load_keywords, load_sites
 from news_monitor.models import KeywordCandidate, ParsedResult
@@ -122,3 +124,77 @@ def test_import_keywords_migrates_legacy_ids(conn):
         ]
         == 0
     )
+
+
+def test_rebuild_viewer_cache_summarizes_keyword_groups(conn):
+    keyword = KeywordCandidate(
+        base_keyword_id="kwg_company",
+        base_keyword="Example Company",
+        group_type="company",
+        candidate_keyword_id="kwc_example",
+        candidate_keyword="Example",
+        enabled=True,
+        notes=None,
+    )
+    another_candidate = KeywordCandidate(
+        base_keyword_id="kwg_company",
+        base_keyword="Example Company",
+        group_type="company",
+        candidate_keyword_id="kwc_example_alt",
+        candidate_keyword="Example Alt",
+        enabled=True,
+        notes=None,
+    )
+    topic = KeywordCandidate(
+        base_keyword_id="kwg_topic",
+        base_keyword="生成AI",
+        group_type="topic",
+        candidate_keyword_id="kwc_topic",
+        candidate_keyword="生成AI",
+        enabled=True,
+        notes=None,
+    )
+    database.import_keywords(conn, [keyword, another_candidate, topic])
+    conn.execute(
+        """
+        INSERT INTO search_result_items (
+            result_item_id, site_id, title, url, canonical_url, published_date,
+            snippet, first_seen_at, last_seen_at, last_fetched_at
+        )
+        VALUES
+            ('item-1', 'site-a', 'Title 1', 'https://example.com/1', 'https://example.com/1', '2026/06/25', NULL, '2026-06-25T09:00:00+09:00', '2026-06-25T09:00:00+09:00', '2026-06-25T09:00:00+09:00'),
+            ('item-2', 'site-b', 'Title 2', 'https://example.com/2', 'https://example.com/2', '2026/06/24', NULL, '2026-06-24T09:00:00+09:00', '2026-06-24T09:00:00+09:00', '2026-06-24T09:00:00+09:00')
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO search_result_hits (
+            hit_id, result_item_id, base_keyword_id, candidate_keyword_id, site_id,
+            run_id, candidate_keyword, base_keyword, fetched_at, first_seen_at, last_seen_at
+        )
+        VALUES
+            ('hit-1', 'item-1', 'kwg_company', 'kwc_example', 'site-a', 'run-1', 'Example', 'Example Company', '2026-06-26T10:00:00+09:00', '2026-06-26T10:00:00+09:00', '2026-06-26T10:00:00+09:00'),
+            ('hit-2', 'item-1', 'kwg_company', 'kwc_example_alt', 'site-a', 'run-1', 'Example Alt', 'Example Company', '2026-06-26T10:00:00+09:00', '2026-06-26T10:00:00+09:00', '2026-06-26T10:00:00+09:00'),
+            ('hit-3', 'item-2', 'kwg_topic', 'kwc_topic', 'site-b', 'run-1', '生成AI', '生成AI', '2026-06-24T10:00:00+09:00', '2026-06-24T10:00:00+09:00', '2026-06-24T10:00:00+09:00')
+        """
+    )
+    conn.commit()
+
+    database.rebuild_viewer_cache(conn, now=datetime.fromisoformat("2026-06-27T12:00:00+09:00"))
+
+    company = conn.execute(
+        "SELECT * FROM viewer_group_summary WHERE group_id = 'kwg_company'"
+    ).fetchone()
+    topic_row = conn.execute("SELECT * FROM viewer_group_summary WHERE group_id = 'kwg_topic'").fetchone()
+    metadata = conn.execute("SELECT * FROM viewer_metadata WHERE cache_name = 'group_summary'").fetchone()
+
+    assert company["group_type"] == "company"
+    assert company["article_count"] == 1
+    assert company["site_count"] == 1
+    assert company["latest_published_date"] == "2026/06/25"
+    assert company["published_min_days"] == 2
+    assert company["hit_min_days"] == 1
+    assert topic_row["group_type"] == "topic"
+    assert metadata["source_hit_count"] == 3
+    assert metadata["source_item_count"] == 2
+    assert metadata["row_count"] == 2

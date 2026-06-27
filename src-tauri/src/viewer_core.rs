@@ -1,6 +1,5 @@
-﻿
 use chrono::{Local, NaiveDate};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
@@ -29,6 +28,17 @@ pub struct CompanySummary {
     hit_min_days: Option<i64>,
     latest_published_date: Option<String>,
     latest_hit_at: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ViewerMetadata {
+    cache_name: String,
+    rebuilt_at: String,
+    source_hit_count: i64,
+    source_item_count: i64,
+    row_count: i64,
+    status: String,
+    error_message: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -203,7 +213,9 @@ fn parse_published_date(value: Option<&str>) -> Option<NaiveDate> {
 }
 
 fn parse_iso_date_prefix(value: &str) -> Option<NaiveDate> {
-    value.get(0..10).and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
+    value
+        .get(0..10)
+        .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok())
 }
 
 fn days_since(date: Option<NaiveDate>) -> Option<i64> {
@@ -212,19 +224,47 @@ fn days_since(date: Option<NaiveDate>) -> Option<i64> {
 
 pub fn get_stats(db_path: Option<String>) -> Result<AppStats, String> {
     let conn = open_db(db_path)?;
-    let company_count = conn
-        .query_row(
+    let has_summary_cache = viewer_group_summary_available(&conn)?;
+    let cached_metadata = if table_exists(&conn, "viewer_metadata")? {
+        conn.query_row(
+            "SELECT source_item_count, source_hit_count FROM viewer_metadata WHERE cache_name = 'group_summary'",
+            [],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+        )
+        .optional()
+        .map_err(|err| err.to_string())?
+    } else {
+        None
+    };
+    let company_count = if has_summary_cache {
+        conn.query_row("SELECT COUNT(*) FROM viewer_group_summary", [], |row| {
+            row.get(0)
+        })
+        .map_err(|err| err.to_string())?
+    } else {
+        conn.query_row(
             "SELECT COUNT(*) FROM keyword_groups WHERE enabled = 1",
             [],
             |row| row.get(0),
         )
-        .map_err(|err| err.to_string())?;
-    let article_count = conn
-        .query_row("SELECT COUNT(*) FROM search_result_items", [], |row| row.get(0))
-        .map_err(|err| err.to_string())?;
-    let hit_count = conn
-        .query_row("SELECT COUNT(*) FROM search_result_hits", [], |row| row.get(0))
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| err.to_string())?
+    };
+    let article_count = if let Some((source_item_count, _)) = cached_metadata {
+        source_item_count
+    } else {
+        conn.query_row("SELECT COUNT(*) FROM search_result_items", [], |row| {
+            row.get(0)
+        })
+        .map_err(|err| err.to_string())?
+    };
+    let hit_count = if let Some((_, source_hit_count)) = cached_metadata {
+        source_hit_count
+    } else {
+        conn.query_row("SELECT COUNT(*) FROM search_result_hits", [], |row| {
+            row.get(0)
+        })
+        .map_err(|err| err.to_string())?
+    };
     let latest_run = conn
         .query_row(
             "SELECT started_at, status FROM search_runs ORDER BY started_at DESC LIMIT 1",
@@ -242,7 +282,10 @@ pub fn get_stats(db_path: Option<String>) -> Result<AppStats, String> {
     })
 }
 
-pub fn get_companies(db_path: Option<String>, sort: Option<String>) -> Result<Vec<CompanySummary>, String> {
+pub fn get_companies(
+    db_path: Option<String>,
+    sort: Option<String>,
+) -> Result<Vec<CompanySummary>, String> {
     let conn = open_db(db_path)?;
     ensure_keyword_group_type_column(&conn)?;
     get_companies_by_type(conn, sort, "company".to_string())
@@ -256,6 +299,35 @@ pub fn get_keyword_summaries(
     let conn = open_db(db_path)?;
     ensure_keyword_group_type_column(&conn)?;
     get_companies_by_type(conn, sort, normalize_group_type(group_type.as_deref()))
+}
+
+pub fn get_viewer_metadata(db_path: Option<String>) -> Result<Option<ViewerMetadata>, String> {
+    let conn = open_db(db_path)?;
+    if !table_exists(&conn, "viewer_metadata")? {
+        return Ok(None);
+    }
+    conn.query_row(
+        r#"
+        SELECT cache_name, rebuilt_at, source_hit_count, source_item_count,
+               row_count, status, error_message
+        FROM viewer_metadata
+        WHERE cache_name = 'group_summary'
+        "#,
+        [],
+        |row| {
+            Ok(ViewerMetadata {
+                cache_name: row.get(0)?,
+                rebuilt_at: row.get(1)?,
+                source_hit_count: row.get(2)?,
+                source_item_count: row.get(3)?,
+                row_count: row.get(4)?,
+                status: row.get(5)?,
+                error_message: row.get(6)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(|err| err.to_string())
 }
 
 fn ensure_keyword_group_type_column(conn: &Connection) -> Result<(), String> {
@@ -350,6 +422,10 @@ fn get_companies_by_type(
     sort: Option<String>,
     group_type: String,
 ) -> Result<Vec<CompanySummary>, String> {
+    if viewer_group_summary_available(&conn)? {
+        return get_cached_companies_by_type(&conn, sort, group_type);
+    }
+
     let mut stmt = conn
         .prepare(
             r#"
@@ -413,15 +489,103 @@ fn get_companies_by_type(
                 |row| row.get(0),
             )
             .map_err(|err| err.to_string())?;
-        company.hit_min_days = hit_min.as_deref().and_then(parse_iso_date_prefix).and_then(|date| days_since(Some(date)));
+        company.hit_min_days = hit_min
+            .as_deref()
+            .and_then(parse_iso_date_prefix)
+            .and_then(|date| days_since(Some(date)));
     }
 
     match sort.unwrap_or_else(|| "name".to_string()).as_str() {
-        "published" => companies.sort_by(|a, b| compare_optional_days(a.published_min_days, b.published_min_days).then_with(|| a.base_keyword.cmp(&b.base_keyword))),
-        "hit" => companies.sort_by(|a, b| compare_optional_days(a.hit_min_days, b.hit_min_days).then_with(|| a.base_keyword.cmp(&b.base_keyword))),
+        "published" => companies.sort_by(|a, b| {
+            compare_optional_days(a.published_min_days, b.published_min_days)
+                .then_with(|| a.base_keyword.cmp(&b.base_keyword))
+        }),
+        "hit" => companies.sort_by(|a, b| {
+            compare_optional_days(a.hit_min_days, b.hit_min_days)
+                .then_with(|| a.base_keyword.cmp(&b.base_keyword))
+        }),
         _ => companies.sort_by(|a, b| a.base_keyword.cmp(&b.base_keyword)),
     }
     Ok(companies)
+}
+
+fn get_cached_companies_by_type(
+    conn: &Connection,
+    sort: Option<String>,
+    group_type: String,
+) -> Result<Vec<CompanySummary>, String> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT
+                group_id,
+                group_name,
+                group_type,
+                article_count,
+                site_count,
+                latest_published_date,
+                latest_hit_at,
+                published_min_days,
+                hit_min_days
+            FROM viewer_group_summary
+            WHERE group_type = ?
+            "#,
+        )
+        .map_err(|err| err.to_string())?;
+    let rows = stmt
+        .query_map(params![group_type], |row| {
+            Ok(CompanySummary {
+                base_keyword_id: row.get(0)?,
+                base_keyword: row.get(1)?,
+                group_type: row.get(2)?,
+                article_count: row.get(3)?,
+                site_count: row.get(4)?,
+                latest_published_date: row.get(5)?,
+                latest_hit_at: row.get(6)?,
+                published_min_days: row.get(7)?,
+                hit_min_days: row.get(8)?,
+            })
+        })
+        .map_err(|err| err.to_string())?;
+    let mut companies: Vec<CompanySummary> = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| err.to_string())?;
+
+    match sort.unwrap_or_else(|| "name".to_string()).as_str() {
+        "published" => companies.sort_by(|a, b| {
+            compare_optional_days(a.published_min_days, b.published_min_days)
+                .then_with(|| a.base_keyword.cmp(&b.base_keyword))
+        }),
+        "hit" => companies.sort_by(|a, b| {
+            compare_optional_days(a.hit_min_days, b.hit_min_days)
+                .then_with(|| a.base_keyword.cmp(&b.base_keyword))
+        }),
+        _ => companies.sort_by(|a, b| a.base_keyword.cmp(&b.base_keyword)),
+    }
+    Ok(companies)
+}
+
+fn viewer_group_summary_available(conn: &Connection) -> Result<bool, String> {
+    if !table_exists(conn, "viewer_group_summary")? {
+        return Ok(false);
+    }
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM viewer_group_summary", [], |row| {
+            row.get(0)
+        })
+        .map_err(|err| err.to_string())?;
+    Ok(count > 0)
+}
+
+fn table_exists(conn: &Connection, table_name: &str) -> Result<bool, String> {
+    conn.query_row(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
+        params![table_name],
+        |_| Ok(()),
+    )
+    .optional()
+    .map(|value| value.is_some())
+    .map_err(|err| err.to_string())
 }
 
 fn compare_optional_days(a: Option<i64>, b: Option<i64>) -> Ordering {
@@ -478,14 +642,16 @@ pub fn get_company_results(
                 url: row.get(4)?,
                 published_days: days_since(parse_published_date(published_date.as_deref())),
                 published_date,
-                hit_days: parse_iso_date_prefix(&first_hit_at).and_then(|date| days_since(Some(date))),
+                hit_days: parse_iso_date_prefix(&first_hit_at)
+                    .and_then(|date| days_since(Some(date))),
                 first_hit_at,
                 candidate_keywords: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
                 snippet: row.get(8)?,
             })
         })
         .map_err(|err| err.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|err| err.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|err| err.to_string())
 }
 
 pub fn get_keyword_tree(db_path: Option<String>) -> Result<Vec<KeywordGroupRow>, String> {
@@ -715,7 +881,8 @@ pub fn list_site_requests(db_path: Option<String>) -> Result<Vec<SiteRequestRow>
             })
         })
         .map_err(|err| err.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|err| err.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|err| err.to_string())
 }
 
 pub fn update_site_request(
@@ -817,7 +984,8 @@ pub fn list_keyword_change_requests(
             })
         })
         .map_err(|err| err.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>().map_err(|err| err.to_string())
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|err| err.to_string())
 }
 
 pub fn update_keyword_change_request(
@@ -1043,7 +1211,12 @@ fn normalize_keyword(value: &str) -> Result<String, String> {
 }
 
 fn normalize_group_type(value: Option<&str>) -> String {
-    match value.unwrap_or("company").trim().to_ascii_lowercase().as_str() {
+    match value
+        .unwrap_or("company")
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
         "topic" => "topic".to_string(),
         _ => "company".to_string(),
     }
@@ -1068,4 +1241,3 @@ fn keyword_candidate_id(base_keyword: &str, candidate_keyword: &str, group_type:
     let id = Uuid::new_v5(&KEYWORD_NAMESPACE, key.as_bytes());
     format!("kwc_{}", &id.simple().to_string()[..12])
 }
-
