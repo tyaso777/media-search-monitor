@@ -44,6 +44,9 @@ rules:
   - site_id: chibanippo
     date_rule: machine_datetime
     rationale: "Uses time[datetime] with a year-qualified value."
+  - site_id: shizushin
+    date_rule: machine_datetime
+    rationale: "Uses time[datetime] with a year-qualified value on news.at-s.com search result cards."
   - site_id: kanaloco
     date_rule: explicit_year_only
     rationale: "Only year-qualified dates should be accepted; placeholder date text is ignored."
@@ -143,6 +146,12 @@ rules:
   - site_id: chemical_daily
     date_rule: none
     rationale: "Disabled because no usable public keyword search field/path was confirmed."
+  - site_id: jiji
+    date_rule: relative_japanese_or_explicit_year
+    rationale: "Google CSE snippets expose explicit dates such as 2026/06/17 and relative dates such as 4日前; result URLs are limited to /jc/article."
+  - site_id: impress_watch
+    date_rule: explicit_year_only
+    rationale: "Google CSE snippets expose explicit yyyy/mm/dd dates; result URLs span watch.impress.co.jp subdomains and are limited to /docs/ article paths."
   - site_id: denki_shimbun
     date_rule: explicit_year_only
     rationale: "Google CSE snippets sometimes expose yyyy/mm/dd dates; missing snippet dates are completed by article page fallback."

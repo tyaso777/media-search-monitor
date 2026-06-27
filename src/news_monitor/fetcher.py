@@ -151,6 +151,7 @@ class GoogleCseFetcher:
             response = client.get(_google_cse_element_url(site, cse_config, query, url))
             response.raise_for_status()
             payload = _parse_google_cse_jsonp(response.text, self.CALLBACK)
+            _raise_for_google_cse_error(payload, response.request)
         return FetchResponse(url=url, html=_google_cse_payload_to_html(payload))
 
 
@@ -241,6 +242,30 @@ def _parse_google_cse_jsonp(text: str, callback: str) -> dict:
     if start < 0 or end < 0:
         raise ValueError("Malformed Google CSE JSONP response")
     return json.loads(text[start + 1 : end])
+
+
+def _raise_for_google_cse_error(payload: dict, request: httpx.Request) -> None:
+    """Raise an HTTP-like exception when Google CSE returns an error payload."""
+
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return
+
+    raw_code = error.get("code")
+    try:
+        status_code = int(raw_code)
+    except (TypeError, ValueError):
+        status_code = 502
+    if not 100 <= status_code <= 599:
+        status_code = 502
+
+    message = str(error.get("message") or "Google CSE returned an error payload")
+    response = httpx.Response(status_code, request=request, text=message)
+    raise httpx.HTTPStatusError(
+        f"Google CSE error {status_code}: {message}",
+        request=request,
+        response=response,
+    )
 
 
 def _google_cse_payload_to_html(payload: dict) -> str:

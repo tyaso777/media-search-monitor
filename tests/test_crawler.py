@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import threading
+import time
 
 import httpx
 
@@ -45,6 +47,26 @@ class MappingFetcher:
         if url in self.pages:
             return FetchResponse(url=url, html=self.pages[url])
         return FetchResponse(url=url, html=self.pages["__search__"])
+
+
+class ConcurrencyTrackingFetcher:
+    def __init__(self) -> None:
+        self.active = 0
+        self.max_active = 0
+        self.lock = threading.Lock()
+        self.calls: list[str] = []
+        self.started_at: list[float] = []
+
+    def fetch(self, url, site):
+        with self.lock:
+            self.active += 1
+            self.max_active = max(self.max_active, self.active)
+            self.calls.append(site.site_id)
+            self.started_at.append(time.monotonic())
+        time.sleep(0.05)
+        with self.lock:
+            self.active -= 1
+        return FetchResponse(url=url, html="<!doctype html><html><body></body></html>")
 
 
 def test_crawl_persists_results_and_skips_playwright_disabled(imported_conn, repo_root, fixture_html):
@@ -165,3 +187,106 @@ def test_crawl_fills_missing_date_from_article_page(conn, repo_root):
     row = conn.execute("SELECT published_date FROM search_result_items").fetchone()
     assert row["published_date"] == "2026/06/20"
     assert article_url in fetcher.urls
+
+
+def test_google_cse_sites_are_prioritized(conn, repo_root):
+    app_config = load_app_config(repo_root / "config" / "app.yaml")
+    sample_site, dynamic_site = load_sites(repo_root / "config" / "sites.yaml")[:2]
+    http_site = replace(
+        sample_site,
+        site_id="ordinary_site",
+        enabled=True,
+        requires_playwright=False,
+        fetch_strategy="httpx",
+    )
+    cse_site = replace(
+        dynamic_site,
+        site_id="cse_site",
+        enabled=True,
+        requires_playwright=False,
+        fetch_strategy="google_cse",
+        google_cse_cx="test-cx",
+    )
+    database.import_sites(conn, [http_site, cse_site])
+
+    crawler = Crawler(conn, app_config, sleep_enabled=False)
+
+    assert [site.site_id for site in crawler._sites_to_crawl()] == [
+        "cse_site",
+        "ordinary_site",
+    ]
+
+
+def test_google_cse_fetches_are_globally_serialized(conn, repo_root):
+    app_config = load_app_config(repo_root / "config" / "app.yaml")
+    app_config = replace(
+        app_config,
+        crawler=replace(app_config.crawler, max_concurrent_sites=2),
+    )
+    from news_monitor.config import load_keywords
+
+    database.import_keywords(conn, load_keywords(repo_root / "config" / "keywords.csv")[:1])
+    base_site = load_sites(repo_root / "config" / "sites.yaml")[0]
+    cse_sites = [
+        replace(
+            base_site,
+            site_id=f"cse_site_{index}",
+            site_name=f"CSE Site {index}",
+            enabled=True,
+            requires_playwright=False,
+            fetch_strategy="google_cse",
+            google_cse_cx=f"test-cx-{index}",
+        )
+        for index in range(2)
+    ]
+    database.import_sites(conn, cse_sites)
+    fetcher = ConcurrencyTrackingFetcher()
+
+    crawler = Crawler(
+        conn,
+        app_config,
+        google_cse_fetcher=fetcher,
+        sleep_enabled=False,
+    )
+    crawler.crawl()
+
+    assert sorted(fetcher.calls) == ["cse_site_0", "cse_site_1"]
+    assert fetcher.max_active == 1
+
+
+def test_google_cse_fetches_wait_between_requests(conn, repo_root):
+    app_config = load_app_config(repo_root / "config" / "app.yaml")
+    app_config = replace(
+        app_config,
+        crawler=replace(app_config.crawler, max_concurrent_sites=2),
+    )
+    from news_monitor.config import load_keywords
+
+    database.import_keywords(conn, load_keywords(repo_root / "config" / "keywords.csv")[:1])
+    base_site = load_sites(repo_root / "config" / "sites.yaml")[0]
+    cse_sites = [
+        replace(
+            base_site,
+            site_id=f"cse_wait_site_{index}",
+            site_name=f"CSE Wait Site {index}",
+            enabled=True,
+            requires_playwright=False,
+            fetch_strategy="google_cse",
+            google_cse_cx=f"test-cx-{index}",
+        )
+        for index in range(2)
+    ]
+    database.import_sites(conn, cse_sites)
+    fetcher = ConcurrencyTrackingFetcher()
+
+    crawler = Crawler(
+        conn,
+        app_config,
+        google_cse_fetcher=fetcher,
+        sleep_enabled=True,
+    )
+    crawler.google_cse_min_interval_seconds = 0.05
+    crawler.crawl()
+
+    assert len(fetcher.started_at) == 2
+    assert fetcher.started_at[1] - fetcher.started_at[0] >= 0.045

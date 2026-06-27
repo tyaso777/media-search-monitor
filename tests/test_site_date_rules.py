@@ -3,7 +3,7 @@ from __future__ import annotations
 import yaml
 
 from news_monitor.config import load_sites
-from news_monitor.date_utils import SUPPORTED_DATE_RULES, normalize_published_date
+from news_monitor.date_utils import SUPPORTED_DATE_RULES, best_published_date, normalize_published_date
 from news_monitor.fetcher import SUPPORTED_FETCH_STRATEGIES
 from news_monitor.parser import (
     SUPPORTED_DATE_STRATEGIES,
@@ -341,6 +341,177 @@ def test_chunichi_uses_correct_search_endpoint_and_google_cse_result_dates(repo_
     )
     assert results[1].url == "https://www.chunichi.co.jp/article/1265399"
     assert normalize_published_date(results[1].published_date, None, site.date_rule) == "2026/06/11"
+
+
+def test_jiji_uses_google_cse_and_article_url_filter(repo_root):
+    sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
+    site = sites["jiji"]
+
+    assert site.enabled is True
+    assert site.search_url_template == "https://www.jiji.com/jc/cse?q={query}"
+    assert site.requires_playwright is False
+    assert site.fetch_strategy == "google_cse"
+    assert site.google_cse_lightweight_candidate is True
+    assert site.google_cse_cx == "eeb1e5dc176b1d4dd"
+    assert site.result_item_selector == ".gsc-webResult.gsc-result"
+    assert site.url_selector == "a.gs-title[href]"
+    assert site.date_selector == ".gs-snippet"
+    assert site.date_rule == "relative_japanese_or_explicit_year"
+    assert site.require_keyword_in_result is False
+
+    html = (repo_root / "tests" / "fixtures" / "jiji_google_cse_result.html").read_text(
+        encoding="utf-8"
+    )
+    results = parse_search_results(html, site, "https://www.jiji.com/jc/cse?q=toyota")
+
+    assert len(results) == 2
+    assert results[0].url == "https://www.jiji.com/jc/article?k=2026061700114&g=eco"
+    assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2026/06/17"
+    assert results[1].url == "https://www.jiji.com/jc/article?k=2026062300145&g=eco"
+    assert (
+        best_published_date(
+            results[1].published_date,
+            results[1].title,
+            results[1].snippet,
+            "2026-06-27T12:00:00+09:00",
+            site.date_rule,
+            results[1].url,
+        )
+        == "2026/06/23"
+    )
+
+
+def test_impress_watch_uses_google_cse_and_watch_subdomain_article_filter(repo_root):
+    sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
+    site = sites["impress_watch"]
+
+    assert site.enabled is True
+    assert site.search_url_template == "https://www.watch.impress.co.jp/extra/ipw/search/?q={query}"
+    assert site.requires_playwright is False
+    assert site.fetch_strategy == "google_cse"
+    assert site.google_cse_lightweight_candidate is True
+    assert site.google_cse_cx == "partner-pub-5723665484085034:7752189602"
+    assert site.result_item_selector == ".gsc-webResult.gsc-result"
+    assert site.url_selector == "a.gs-title[href]"
+    assert site.date_selector == ".gs-snippet"
+    assert site.date_rule == "explicit_year_only"
+    assert site.require_keyword_in_result is False
+    assert "watch.impress.co.jp/docs/" in site.url_include_patterns
+    assert "/docs/news/ranking/" in site.url_exclude_patterns
+
+    html = (
+        repo_root / "tests" / "fixtures" / "impress_watch_google_cse_result.html"
+    ).read_text(encoding="utf-8")
+    results = parse_search_results(
+        html,
+        site,
+        "https://www.watch.impress.co.jp/extra/ipw/search/?q=NTT",
+    )
+
+    assert len(results) == 2
+    assert results[0].url == "https://internet.watch.impress.co.jp/docs/event/2058337.html"
+    assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2025/10/28"
+    assert results[1].url == "https://cloud.watch.impress.co.jp/docs/news/2077990.html"
+    assert normalize_published_date(results[1].published_date, None, site.date_rule) == "2026/01/15"
+
+
+def test_kyodo_uses_archive_card_selectors_and_dotted_dates(repo_root):
+    sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
+    site = sites["kyodo"]
+
+    assert site.result_container_selector == "main"
+    assert site.result_item_selector == ".main_archive__content"
+    assert site.title_selector == ".main_archive__content--ttl"
+    assert site.url_selector == ".main_archive__content--ttl[href]"
+    assert site.date_selector == "time.main_date"
+    assert site.snippet_selector == ".main_archive__content--subtext"
+    assert site.require_keyword_in_result is False
+
+    html = (repo_root / "tests" / "fixtures" / "kyodo_search_result.html").read_text(
+        encoding="utf-8"
+    )
+    results = parse_search_results(html, site, "https://www.kyodo.co.jp/?s=NTT")
+
+    assert len(results) == 1
+    assert results[0].title == "mMEDICI, NTT Precision Medicine and PRiME-R form partnership"
+    assert results[0].url == "https://www.kyodo.co.jp/pr/2026-06-25_4018710/"
+    assert results[0].published_date.startswith("2026.06.25")
+    assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2026/06/25"
+
+
+def test_denshi_device_uses_search_result_card_container(repo_root):
+    sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
+    site = sites["denshi_device"]
+
+    assert site.result_container_selector == ".main-contents.single-contents.dd-main-content"
+    assert site.result_item_selector == "article"
+    assert site.title_selector == "h3.title a"
+    assert site.url_selector == "h3.title a[href^='https://dempa-digital.com/article/']"
+    assert site.date_selector == "ul.post-meta li.date"
+    assert site.require_keyword_in_result is False
+
+    html = (repo_root / "tests" / "fixtures" / "denshi_device_search_result.html").read_text(
+        encoding="utf-8"
+    )
+    results = parse_search_results(html, site, "https://dempa-digital.com/?s=NTT")
+
+    assert len(results) == 1
+    assert results[0].title == "NTT West to open next-generation AI-ready data centers"
+    assert results[0].url == "https://dempa-digital.com/article/718877"
+    assert results[0].published_date == "2026.06.23"
+    assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2026/06/23"
+
+
+def test_shokuhin_sangyo_uses_news_article_cards(repo_root):
+    sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
+    site = sites["shokuhin_sangyo"]
+
+    assert site.result_container_selector == ".main-column"
+    assert site.result_item_selector == "article.news-article-item"
+    assert site.title_selector == ".article-title"
+    assert site.url_selector == ".article-text > a[href^='https://www.ssnp.co.jp/']"
+    assert site.date_selector == ".article-date"
+    assert site.snippet_selector == ".article-excerpt"
+    assert site.require_keyword_in_result is False
+
+    html = (repo_root / "tests" / "fixtures" / "shokuhin_sangyo_search_result.html").read_text(
+        encoding="utf-8"
+    )
+    results = parse_search_results(html, site, "https://www.ssnp.co.jp/?s=toyota")
+
+    assert len(results) == 1
+    assert results[0].title == "Nescafe sleep cafe collaborates with Toyota nap tool"
+    assert results[0].url == "https://www.ssnp.co.jp/beverage/628286/"
+    assert results[0].published_date == "2025年8月22日"
+    assert results[0].snippet == "Nescafe and Toyota developed a tool for short breaks."
+    assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2025/08/22"
+
+
+def test_shizushin_uses_news_at_s_search_result_cards(repo_root):
+    sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
+    site = sites["shizushin"]
+
+    assert site.enabled is True
+    assert site.search_url_template == "https://news.at-s.com/search/list?keyword={query}"
+    assert site.result_container_selector == ".list-inner"
+    assert site.result_item_selector == ".newslistbox"
+    assert site.title_selector == ".news-ttle a.overlay-link"
+    assert site.url_selector == ".news-ttle a.overlay-link[href^='/article/']"
+    assert site.date_selector == "p.date time[datetime]"
+    assert site.snippet_selector is None
+    assert site.date_rule == "machine_datetime"
+    assert site.require_keyword_in_result is False
+
+    html = (repo_root / "tests" / "fixtures" / "shizushin_search_result.html").read_text(
+        encoding="utf-8"
+    )
+    results = parse_search_results(html, site, "https://news.at-s.com/search/list?keyword=NTT")
+
+    assert len(results) == 1
+    assert results[0].title == "Major mobile carriers use AI for bear countermeasures"
+    assert results[0].url == "https://news.at-s.com/article/1996106"
+    assert results[0].published_date == "2026-06-18T15:40:00+09:00"
+    assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2026/06/18"
 
 
 def test_denki_shimbun_uses_google_cse_and_article_date_fallback(repo_root):

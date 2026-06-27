@@ -359,19 +359,23 @@ sites:
   - site_id: shizushin
     site_name: 静岡新聞
     enabled: true
-    search_url_template: "https://www.at-s.com/search/?query={query}"
+    search_url_template: "https://news.at-s.com/search/list?keyword={query}"
     query_encoding: "utf-8"
     requires_playwright: false
-    result_item_selector: "article, .search-result, .article-list li, li"
-    title_selector: "h2 a, h3 a, .title a, a"
-    url_selector: "h2 a, h3 a, .title a, a"
-    date_selector: "time, .date"
-    snippet_selector: "p, .summary"
+    result_container_selector: ".list-inner"
+    result_item_selector: ".newslistbox"
+    title_selector: ".news-ttle a.overlay-link"
+    url_selector: ".news-ttle a.overlay-link[href^='/article/']"
+    date_selector: "p.date time[datetime]"
+    snippet_selector: null
+    date_rule: "machine_datetime"
+    url_include_patterns:
+      - "/article/"
     rate_limit_seconds: 3
     user_agent: "news-monitor-bot/0.1"
     max_pages: 1
     next_page_selector: null
-    notes: "Regional paper via at-s.com; selector verification pending."
+    notes: "Search endpoint confirmed at news.at-s.com/search/list; extraction is scoped to .newslistbox result cards."
 
   - site_id: kyoto_np
     site_name: 京都新聞
@@ -664,7 +668,7 @@ sites:
     url_include_patterns:
       - "https://www.nikkan.co.jp/articles/view/"
       - "http://www.nikkan.co.jp/articles/view/"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: kyodo
     site_name: 共同通信
@@ -690,7 +694,7 @@ sites:
       - "/category/"
       - "kyodonewsprwire.jp"
       - "boatrace.jp"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: nikkei_business
     site_name: 日経ビジネス
@@ -714,7 +718,7 @@ sites:
       - "/about/"
       - "bpreg.nikkeibp.co.jp"
       - "account.nikkeibp.co.jp"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: nikkei_xtech
     site_name: 日経クロステック
@@ -740,7 +744,7 @@ sites:
       - "active.nikkeibp.co.jp"
       - "business.nikkei.com"
       - "info.nikkei.com"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: sbbit
     site_name: ビジネス+IT
@@ -763,24 +767,36 @@ sites:
     url_exclude_patterns:
       - "ad.sbbit.jp"
       - "youtube.com"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: jiji
     site_name: 時事ドットコム
-    enabled: false
-    search_url_template: "https://www.jiji.com/jc/search?keyword={query}"
+    enabled: true
+    search_url_template: "https://www.jiji.com/jc/cse?q={query}"
     query_encoding: "utf-8"
-    requires_playwright: true
-    result_item_selector: "article, .search-result, .article-list li, li"
-    title_selector: "h2 a, h3 a, .title a, a"
-    url_selector: "h2 a, h3 a, .title a, a"
-    date_selector: "time, .date"
-    snippet_selector: "p, .summary"
+    requires_playwright: false
+    fetch_strategy: google_cse
+    result_item_selector: ".gsc-webResult.gsc-result"
+    title_selector: ".gs-title"
+    url_selector: "a.gs-title[href]"
+    date_selector: ".gs-snippet"
+    snippet_selector: ".gs-snippet"
+    date_rule: relative_japanese_or_explicit_year
     rate_limit_seconds: 5
     user_agent: "news-monitor-bot/0.1"
     max_pages: 1
     next_page_selector: null
-    notes: "Disabled candidate: no clear public search route confirmed; enable only after site-specific verification."
+    notes: "Google CSE endpoint confirmed at /jc/cse; direct element/v1 fetch is used and result URLs are limited to /jc/article."
+    url_include_patterns:
+      - "https://www.jiji.com/jc/article"
+    url_exclude_patterns:
+      - "/jc/cse"
+      - "/jc/v7"
+    require_keyword_in_result: false
+    google_cse_lightweight_candidate: true
+    google_cse_cx: "eeb1e5dc176b1d4dd"
+    google_cse_sort: null
+    google_cse_notes: "Uses cse.js to retrieve the short-lived cse_token, then calls the element/v1 JSONP endpoint directly."
 
   - site_id: nikkan_jidosha
     site_name: 日刊自動車新聞 電子版
@@ -804,7 +820,7 @@ sites:
       - "billing.netdenjd.com"
       - "fo-njd-mypage.web.app"
       - "/archives/category/"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: automotive_news_jp
     site_name: Automotive News Japan
@@ -844,7 +860,7 @@ sites:
       - "https://dempa-digital.com/?p="
     url_exclude_patterns:
       - "#tab-"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: itmedia
     site_name: ITmedia
@@ -870,20 +886,32 @@ sites:
 
   - site_id: impress_watch
     site_name: Impress Watch
-    enabled: false
-    search_url_template: "https://www.watch.impress.co.jp/search/?q={query}"
+    enabled: true
+    search_url_template: "https://www.watch.impress.co.jp/extra/ipw/search/?q={query}"
     query_encoding: "utf-8"
     requires_playwright: false
-    result_item_selector: "article, .searchResult, .article-list li, li"
-    title_selector: "h2 a, h3 a, .title a, a"
-    url_selector: "h2 a, h3 a, .title a, a"
-    date_selector: "time, .date"
-    snippet_selector: "p, .summary"
+    result_item_selector: ".gsc-webResult.gsc-result"
+    title_selector: ".gs-title"
+    url_selector: "a.gs-title[href]"
+    date_selector: ".gs-snippet"
+    snippet_selector: ".gs-snippet"
     rate_limit_seconds: 3
     user_agent: "news-monitor-bot/0.1"
     max_pages: 1
     next_page_selector: null
-    notes: "Disabled after crawl returned 404 for configured search URL; needs endpoint confirmation."
+    date_rule: explicit_year_only
+    fetch_strategy: google_cse
+    url_include_patterns:
+      - "watch.impress.co.jp/docs/"
+    url_exclude_patterns:
+      - "/extra/ipw/search"
+      - "/docs/news/ranking/"
+    require_keyword_in_result: false
+    google_cse_lightweight_candidate: true
+    google_cse_cx: "partner-pub-5723665484085034:7752189602"
+    google_cse_sort: null
+    google_cse_notes: "Uses cse.js to retrieve the short-lived cse_token, then calls the element/v1 JSONP endpoint directly."
+    notes: "Google CSE endpoint confirmed at /extra/ipw/search; result URLs span watch.impress.co.jp subdomains and are limited to /docs/ article paths."
 
   - site_id: toyokeizai
     site_name: 東洋経済オンライン
@@ -910,7 +938,7 @@ sites:
       - "twitter.com"
       - "facebook.com"
       - "youtube.com"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: diamond
     site_name: ダイヤモンド・オンライン
@@ -979,7 +1007,7 @@ sites:
       - "/page/"
       - "/company/"
       - "/seminar/"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: logistics_today
     site_name: LOGISTICS TODAY
@@ -1005,7 +1033,7 @@ sites:
       - "/interview"
       - "/seminar"
       - "/advertising"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: kentsu
     enabled: true
@@ -1032,7 +1060,7 @@ sites:
     url_include_patterns:
       - "/articles/artcl_rglr/"
     url_exclude_patterns: []
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: shokuhin_sangyo
     site_name: 食品産業新聞社ニュースWEB
@@ -1058,7 +1086,7 @@ sites:
       - "/company/"
       - "/faq/"
       - "/category/"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: chemical_daily
     site_name: 化学工業日報
@@ -1085,7 +1113,7 @@ sites:
       - "/seminar"
       - "/90th_anniversary"
       - "chemicaldaily.com/"
-    require_keyword_in_result: true
+    require_keyword_in_result: false
 
   - site_id: denki_shimbun
     site_name: 電気新聞ウェブサイト
@@ -1117,4 +1145,4 @@ sites:
       - "digital.denkishimbun.com"
       - "pixabay.com"
       - "/advertising"
-    require_keyword_in_result: true
+    require_keyword_in_result: false

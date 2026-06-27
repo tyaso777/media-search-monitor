@@ -46,3 +46,13 @@ ITmediaは検索結果snippetに `2日前` のような相対日付と `2026/05/
 - fixtureベースのテストでレスポンス形式変化を検知できる。
 
 `cse_token` は固定値として保存しない。毎回 `cse.js` から取得する。
+## 対応済みサイトメモ
+
+- `tokyo_np`: `cx=ec5a58b709f62d071`
+- `chunichi`: `cx=001739771653228343839:pwqh-bnpw8a`
+- `itmedia`: `cx=000492183644671384608:6dff3odaltq`
+- `jiji`: `cx=eeb1e5dc176b1d4dd`
+- `denki_shimbun`: `cx=006048404399787863357:x2karccg12w`
+- `impress_watch`: `cx=partner-pub-5723665484085034:7752189602`
+
+`impress_watch` は検索画面 `https://www.watch.impress.co.jp/extra/ipw/search/?q={query}` からCSEを確認した。結果URLは `internet.watch.impress.co.jp` や `cloud.watch.impress.co.jp` など複数サブドメインにまたがるため、`watch.impress.co.jp/docs/` を含むURLだけを採用し、ランキングページ `/docs/news/ranking/` は除外する。

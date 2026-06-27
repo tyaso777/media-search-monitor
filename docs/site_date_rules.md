@@ -30,6 +30,9 @@
 
 | site_id | サイト上の掲載日表示ロジック | 実装した抽出ロジック | 変化検知テスト |
 |---|---|---|---|
+| shizushin | 検索URLは `https://news.at-s.com/search/list?keyword={query}`。検索結果カードは `.list-inner .newslistbox`。タイトル/URLは `.news-ttle a.overlay-link`、掲載日は `p.date time[datetime]` に `2026-06-18T15:40:00+09:00` のような機械可読日時で入る。 | `machine_datetime`。`time[datetime]` の年付き日時を取得して `yyyy/mm/dd` に正規化する。 | `tests/fixtures/shizushin_search_result.html` で検索結果領域、カードselector、URL、`datetime` 正規化を検査。 |
+| jiji | 検索画面は `https://www.jiji.com/jc/cse#gsc.tab=0&gsc.q={query}&gsc.sort=`。実装ではGoogle CSE `cx=eeb1e5dc176b1d4dd` を使い、`element/v1` を直接取得する。検索結果には `/jc/article` の記事と `/jc/v7` の特集ページが混在する。 | `relative_japanese_or_explicit_year`。snippet内の `2026/06/17` などの明示日付を優先し、`4 日前` などの相対日付はクロール時刻基準で正規化する。URLは `https://www.jiji.com/jc/article` のみ採用する。canonical URLでは記事IDの `k` を保持し、同一ページ表示に不要な分類パラメータ `g` は削除する。 | `tests/fixtures/jiji_google_cse_result.html` で `/jc/v7` 除外、記事URL抽出、明示日付・相対日付の正規化を検査。`tests/test_url_utils.py` で `g` だけを削除して `k` を保持することを検査。 |
+| impress_watch | 検索画面は `https://www.watch.impress.co.jp/extra/ipw/search/?q={query}`。実装ではGoogle CSE `cx=partner-pub-5723665484085034:7752189602` を使い、`element/v1` を直接取得する。検索結果URLは `internet.watch.impress.co.jp`、`cloud.watch.impress.co.jp` など複数サブドメインにまたがる。 | `explicit_year_only`。snippet内の `2025/10/28` や `2026/01/15` などの明示年付き日付だけを採用する。URLは `watch.impress.co.jp/docs/` を含むものに限定し、`/docs/news/ranking/` は除外する。 | `tests/fixtures/impress_watch_google_cse_result.html` でサブドメイン記事URL抽出、ランキングURL除外、明示年付き日付の正規化を検査。 |
 | asahi | 現selectorでは検索結果カード内に信頼できる掲載日なし。 | `date_rule: none`。掲載日は保存しない。 | enabled siteが必ずdate_ruleを持つことを検査。 |
 | yomiuri | `time[datetime]` に年付き日時。表示も年付き。 | `machine_datetime`。`.c-list-date time[datetime]` の属性値を優先。 | `machine_datetime` がサポート済みルールであることを検査。 |
 | mainichi | `2026/6/18 19:11` のように年付き。 | `explicit_year_only`。年なしは採用しない。 | 年なし `6/18` が mainichi では `NULL` になることを検査。 |
@@ -63,12 +66,12 @@
 | ehime_np | 現検索結果selectorでは掲載日なし。 | `none`。 | enabled site date_rule網羅テスト。 |
 | saga_np | 表示は時刻や月日の場合あり、`datetime` に年付き日付。 | `machine_datetime`。属性値を優先。 | ルールサポート検査。 |
 | nikkan_kogyo | `.ttl .date` に年付き日付想定。 | `explicit_year_only`。年なしなら次回調査でrule変更。 | 年付きスラッシュ日付の共通正規化テスト。 |
-| kyodo | WordPress系の `time` / `.posted-on` 想定。 | `machine_datetime`。属性値または年付き値のみ。 | ルールサポート検査。 |
+| kyodo | 検索結果カードは `main .main_archive__content`。タイトル/URLは `.main_archive__content--ttl`、掲載日は `time.main_date` に `2026.06.25 11:00` のようなドット区切り年付き日時で出る。 | `machine_datetime`。検索結果カード単位のCSS selectorで取得し、ドット区切り年付き日時を `yyyy/mm/dd` に正規化する。 | `tests/fixtures/kyodo_search_result.html` でカードselector、URL、`2026.06.25` の正規化を検査。 |
 | nikkei_business | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
 | nikkei_xtech | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
 | sbbit | `.crd_ttl-pubdate` に年付き日付想定。 | `explicit_year_only`。 | 年付き日付の共通正規化テスト。 |
 | nikkan_jidosha | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
-| denshi_device | WordPress系の `time` / `.posted-on` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
+| denshi_device | 検索結果領域は `.main-contents.single-contents.dd-main-content`。カードは `article`、タイトル/URLは `h3.title a`、掲載日は `ul.post-meta li.date` に `2026.06.23` のようなドット区切り年付き日付で出る。 | `machine_datetime`。検索結果カード単位のCSS selectorで取得し、ドット区切り年付き日付を `yyyy/mm/dd` に正規化する。 | `tests/fixtures/denshi_device_search_result.html` で検索結果領域、カードselector、URL、`2026.06.23` の正規化を検査。 |
 | itmedia | Google CSEで独立日付なし。snippetに `2日前` と `2026/05/28` のような相対/絶対日付が混在する。 | `relative_japanese_or_explicit_year`。`.gs-snippet` を日付候補として取得し、相対日付はクロール取得時刻基準で正規化する。 | Google CSE fixtureで `2日前` と `2026/05/28` の両方を正規化できることを検査。 |
 | toyokeizai | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
 | diamond | 正しい検索URLは `/list/search?fulltext=`。検索結果カード `.article-list-eh > a` 内の `time.published` に `2026年6月20日 6:50` のような年付き日付が表示される。 | `explicit_year_only`。年付き日本語日付のみ正規化する。 | `tests/fixtures/diamond_search_result.html` でURL・title・`time.published` の抽出と `2026/06/19` への正規化を検査。 |
@@ -76,7 +79,7 @@
 | ryutsuu_biz | 実サイト確認では現在のselectorが広く、検索結果カードの日付表示規則を厳密に確認できていない。 | `explicit_year_only`。年なし表示は補完しない。 | 年なし月日を補完しない方針は共通テストで担保。 |
 | logistics_today | `.list-heading small` に日付想定。 | `explicit_year_only`。年なしなら次回調査でrule変更。 | 年付き日付の共通正規化テスト。 |
 | kentsu | 検索画面は `/articles/artcl_allartcllist` のフォーム型。`#keyword-input` に検索語を入力して送信後、検索結果カード `a[href*='/articles/artcl_rglr/']` 内の `time` に `6/18 20:37` のような年なし月日が出る。ユーザー確認では昨年以前は `yyyy/mm/dd` 形式。 | `current_year_if_yearless`。年なし `M/D HH:MM` はクロール取得時刻の年で補完し、`yyyy/mm/dd` は明示年としてそのまま正規化する。 | `tests/fixtures/kentsu_search_result.html` で年なし `6/18 20:37` と年付き `2025/12/01 09:00` の両方を検査。 |
-| shokuhin_sangyo | WordPress系の `time` / `.posted-on` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
+| shokuhin_sangyo | 検索結果領域は `.main-column`。カードは `article.news-article-item`。タイトルは `.article-title`、URLは `.article-text > a`、掲載日は `.article-date` に `2025年8月22日` のような年付き日付で表示される。 | `machine_datetime`。年付き値のみ。 | `tests/fixtures/shokuhin_sangyo_search_result.html` でカード単位のURL・タイトル・掲載日・snippet抽出を検査。 |
 | chemical_daily | WordPress系の `time` / `.posted-on` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
 | denki_shimbun | Google CSEスニペットに `yyyy/mm/dd` が出る結果と、日付が出ない結果が混在。記事ページは `article:published_time` / JSON-LD `datePublished`。 | `explicit_year_only`。検索結果スニペットの日付を拾い、欠けるものは記事ページfallback。 | CSE fixtureでスニペット日付、記事fixtureでmeta/JSON-LD取得を検査。 |
 

@@ -27,6 +27,8 @@ from news_monitor.url_utils import encode_query
 
 LOGGER = logging.getLogger(__name__)
 
+GOOGLE_CSE_MIN_INTERVAL_SECONDS = 3.0
+
 
 class FetcherProtocol(Protocol):
     """Fetcher protocol used by the crawler."""
@@ -79,6 +81,9 @@ class Crawler:
         self.db_path = database.main_database_path(conn)
         max_playwright = max(1, app_config.crawler.max_concurrent_playwright_sites)
         self.playwright_semaphore = BoundedSemaphore(max_playwright)
+        self.google_cse_semaphore = BoundedSemaphore(1)
+        self.google_cse_min_interval_seconds = GOOGLE_CSE_MIN_INTERVAL_SECONDS
+        self.last_google_cse_fetch_started_at: float | None = None
 
     def crawl(self) -> str:
         """Run a full crawl and return the run ID."""
@@ -166,7 +171,9 @@ class Crawler:
             page_url = site.search_url_template.format(query=query)
             try:
                 fetcher = self._fetcher_for_site(site)
-                if self._requires_playwright_runtime(site):
+                if site.fetch_strategy == "google_cse":
+                    fetched = self._fetch_google_cse(page_url, site, fetcher)
+                elif self._requires_playwright_runtime(site):
                     with self.playwright_semaphore:
                         fetched = fetcher.fetch(page_url, site)
                 else:
@@ -259,6 +266,20 @@ class Crawler:
         if site.fetch_strategy == "google_cse":
             return self.google_cse_fetcher
         raise ValueError(f"Unsupported fetch_strategy: {site.fetch_strategy}")
+
+    def _fetch_google_cse(
+        self, page_url: str, site: SiteConfig, fetcher: FetcherProtocol
+    ) -> FetchResponse:
+        """Fetch one Google CSE page with a global minimum interval."""
+
+        with self.google_cse_semaphore:
+            if self.sleep_enabled and self.last_google_cse_fetch_started_at is not None:
+                elapsed = time.monotonic() - self.last_google_cse_fetch_started_at
+                wait_seconds = self.google_cse_min_interval_seconds - elapsed
+                if wait_seconds > 0:
+                    time.sleep(wait_seconds)
+            self.last_google_cse_fetch_started_at = time.monotonic()
+            return fetcher.fetch(page_url, site)
 
     def _fill_missing_dates_from_articles(
         self,
@@ -480,9 +501,15 @@ class Crawler:
         sites = database.enabled_sites(self.conn)
         if self.site_ids is not None:
             sites = [site for site in sites if site.site_id in self.site_ids]
+        sites = sorted(sites, key=self._site_priority_key)
         if self.max_sites is not None:
             sites = sites[: self.max_sites]
         return sites
+
+    def _site_priority_key(self, site: SiteConfig) -> tuple[int, str]:
+        """Prioritize shared Google CSE searches before ordinary site fetches."""
+
+        return (0 if site.fetch_strategy == "google_cse" else 1, site.site_id)
 
     def _keywords_to_crawl(self) -> list[sqlite3.Row]:
         """Return enabled candidate keywords after optional CLI filtering."""

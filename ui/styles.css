@@ -750,9 +750,14 @@ input {
 }
 
 .site-target-table-wrap {
+  height: 100%;
   min-height: 0;
   overflow: auto;
-  padding: 14px 18px 18px;
+  margin: 14px 18px 18px;
+  padding: 0;
+  border: 1px solid #dbe1e8;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .site-target-table {
@@ -760,9 +765,9 @@ input {
   min-width: 900px;
   border-collapse: separate;
   border-spacing: 0;
-  overflow: hidden;
-  border: 1px solid #dbe1e8;
-  border-radius: 8px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
   background: #ffffff;
 }
 
@@ -777,8 +782,9 @@ input {
 .site-target-table th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 10;
   background: #f6f7f1;
+  box-shadow: 0 1px 0 #dbe1e8;
   color: #344252;
   font-size: 12px;
   font-weight: 650;

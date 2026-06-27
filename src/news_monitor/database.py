@@ -520,7 +520,7 @@ def upsert_result(
 ) -> str:
     """Upsert a URL-level search result item and return its ID."""
 
-    canonical_url = canonicalize_url(result.url, page_url)
+    canonical_url = canonicalize_url(result.url, page_url, site.site_id)
     result_item_id = uuid.uuid4().hex
     conn.execute(
         """

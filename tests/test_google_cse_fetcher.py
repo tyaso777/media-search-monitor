@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import httpx
+import pytest
+
 from news_monitor.config import load_sites
 from news_monitor.date_utils import best_published_date
 from news_monitor.fetcher import (
     GoogleCseFetcher,
     _google_cse_payload_to_html,
     _parse_google_cse_jsonp,
+    _raise_for_google_cse_error,
 )
 from news_monitor.parser import parse_search_results
 
@@ -96,3 +100,23 @@ google.search.cse.api00000({
         )
         == "2026/06/19"
     )
+
+
+def test_google_cse_error_payload_raises_http_status_error():
+    payload = """
+/*O_o*/
+google.search.cse.api00000({
+  "error": {
+    "code": 429,
+    "message": "Our systems have detected unusual traffic from your network."
+  }
+});
+"""
+    data = _parse_google_cse_jsonp(payload, GoogleCseFetcher.CALLBACK)
+    request = httpx.Request("GET", "https://cse.google.com/cse/element/v1")
+
+    with pytest.raises(httpx.HTTPStatusError) as exc_info:
+        _raise_for_google_cse_error(data, request)
+
+    assert exc_info.value.response.status_code == 429
+    assert "Google CSE error 429" in str(exc_info.value)

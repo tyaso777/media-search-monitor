@@ -50,7 +50,7 @@ def test_load_sites(repo_root):
     logistics = next(site for site in sites if site.site_id == "logistics_today")
     assert logistics.result_item_selector == ".newsList .list"
     assert logistics.url_selector == ".list-heading p a[href^='https://www.logi-today.com/']"
-    assert logistics.require_keyword_in_result is True
+    assert logistics.require_keyword_in_result is False
     minyu = next(site for site in sites if site.site_id == "minyu")
     assert minyu.search_url_template == "https://www.minyu-net.com/search?q={query}"
     assert minyu.result_container_selector == "section.top-news.primary ul.thumbnail-list.wide"

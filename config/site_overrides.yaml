@@ -145,13 +145,13 @@ overrides:
 
   - site_id: kyodo
     result_container_selector: "main"
-    result_item_selector: "article"
-    title_selector: "h2 a, h3 a, .entry-title a, a"
-    url_selector: "h2 a, h3 a, .entry-title a[href], a[href]"
-    date_selector: "time, .date, .posted-on"
-    snippet_selector: ".entry-summary, p"
+    result_item_selector: ".main_archive__content"
+    title_selector: ".main_archive__content--ttl"
+    url_selector: ".main_archive__content--ttl[href]"
+    date_selector: "time.main_date"
+    snippet_selector: ".main_archive__content--subtext"
     no_results_text: "検索結果がありません"
-    notes: "Search result extraction is scoped to main article blocks to avoid navigation links."
+    notes: "Search result extraction is scoped to Kyodo archive cards to avoid navigation links."
 
   - site_id: tokyo_np
     requires_playwright: false
@@ -204,14 +204,14 @@ overrides:
     notes: "Search result article blocks verified against pilot static HTML."
 
   - site_id: denshi_device
-    result_container_selector: "main, .site-main"
+    result_container_selector: ".main-contents.single-contents.dd-main-content"
     result_item_selector: "article"
-    title_selector: "h2 a, h3 a, .entry-title a, a"
-    url_selector: "h2 a, h3 a, .entry-title a[href], a[href]"
-    date_selector: "time, .date, .posted-on"
-    snippet_selector: ".entry-summary, p"
+    title_selector: "h3.title a"
+    url_selector: "h3.title a[href^='https://dempa-digital.com/article/']"
+    date_selector: "ul.post-meta li.date"
+    snippet_selector: null
     no_results_text: "記事は見つかりませんでした"
-    notes: "Search result extraction is scoped to article blocks to avoid navigation/list links."
+    notes: "Search result extraction is scoped to Dempa search result article cards under .main-contents."
 
   - site_id: niigata_nippo
     result_item_selector: ".l-articles .m-article"
@@ -343,14 +343,14 @@ overrides:
     notes: "Search result extraction is scoped to .post-list items to avoid navigation links."
 
   - site_id: shokuhin_sangyo
-    result_container_selector: ".main-column, main"
-    result_item_selector: "article"
-    title_selector: "h2 a, h3 a, .entry-title a, a"
-    url_selector: "h2 a, h3 a, .entry-title a[href], a[href]"
-    date_selector: "time, .date, .posted-on"
-    snippet_selector: ".entry-summary, p"
+    result_container_selector: ".main-column"
+    result_item_selector: "article.news-article-item"
+    title_selector: ".article-title"
+    url_selector: ".article-text > a[href^='https://www.ssnp.co.jp/']"
+    date_selector: ".article-date"
+    snippet_selector: ".article-excerpt"
     no_results_text: "検索されたキーワードが含まれる記事は見つかりませんでした"
-    notes: "Search result extraction is scoped to search-result article blocks and returns zero when the site shows its no-result message."
+    notes: "Search result extraction is scoped to SSNP news article cards under .main-column."
 
   - site_id: kumamoto_nichi
     requires_playwright: false
@@ -422,5 +422,54 @@ overrides:
     notes: "Pilot search URL returned 404. Disabled until the current public search endpoint is confirmed."
 
   - site_id: shizushin
-    enabled: false
-    notes: "Pilot search URL returned 404/fallback content instead of search results. Disabled until endpoint is confirmed."
+    enabled: true
+    search_url_template: "https://news.at-s.com/search/list?keyword={query}"
+    result_container_selector: ".list-inner"
+    result_item_selector: ".newslistbox"
+    title_selector: ".news-ttle a.overlay-link"
+    url_selector: ".news-ttle a.overlay-link[href^='/article/']"
+    date_selector: "p.date time[datetime]"
+    snippet_selector: null
+    date_rule: machine_datetime
+    url_include_patterns: ["/article/"]
+    notes: "Search endpoint confirmed at news.at-s.com/search/list; extraction is scoped to .newslistbox result cards."
+
+  - site_id: jiji
+    enabled: true
+    search_url_template: "https://www.jiji.com/jc/cse?q={query}"
+    requires_playwright: false
+    fetch_strategy: google_cse
+    result_item_selector: ".gsc-webResult.gsc-result"
+    title_selector: ".gs-title"
+    url_selector: "a.gs-title[href]"
+    date_selector: ".gs-snippet"
+    snippet_selector: ".gs-snippet"
+    date_rule: relative_japanese_or_explicit_year
+    url_include_patterns: ["https://www.jiji.com/jc/article"]
+    url_exclude_patterns: ["/jc/cse", "/jc/v7"]
+    require_keyword_in_result: false
+    google_cse_lightweight_candidate: true
+    google_cse_cx: "eeb1e5dc176b1d4dd"
+    google_cse_sort: null
+    google_cse_notes: "Uses cse.js to retrieve the short-lived cse_token, then calls the element/v1 JSONP endpoint directly."
+    notes: "Google CSE endpoint confirmed at /jc/cse; direct element/v1 fetch is used and result URLs are limited to /jc/article."
+
+  - site_id: impress_watch
+    enabled: true
+    search_url_template: "https://www.watch.impress.co.jp/extra/ipw/search/?q={query}"
+    requires_playwright: false
+    fetch_strategy: google_cse
+    result_item_selector: ".gsc-webResult.gsc-result"
+    title_selector: ".gs-title"
+    url_selector: "a.gs-title[href]"
+    date_selector: ".gs-snippet"
+    snippet_selector: ".gs-snippet"
+    date_rule: explicit_year_only
+    url_include_patterns: ["watch.impress.co.jp/docs/"]
+    url_exclude_patterns: ["/extra/ipw/search", "/docs/news/ranking/"]
+    require_keyword_in_result: false
+    google_cse_lightweight_candidate: true
+    google_cse_cx: "partner-pub-5723665484085034:7752189602"
+    google_cse_sort: null
+    google_cse_notes: "Uses cse.js to retrieve the short-lived cse_token, then calls the element/v1 JSONP endpoint directly."
+    notes: "Google CSE endpoint confirmed at /extra/ipw/search; result URLs span watch.impress.co.jp subdomains and are limited to /docs/ article paths."
