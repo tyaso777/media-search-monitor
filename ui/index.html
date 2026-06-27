@@ -190,6 +190,7 @@
                   <p id="keyword-detail-meta">親キーワードを選択してください</p>
                 </div>
               </div>
+              <div id="keyword-parent-status" class="parent-status" hidden></div>
               <div id="candidate-list" class="candidate-list"></div>
             </section>
           </div>
@@ -405,17 +406,26 @@
           </aside>
 
           <section class="admin-detail">
+            <div class="admin-subtabs" aria-label="管理タブ内メニュー">
+              <button class="admin-subtab active" type="button" data-admin-panel="admin-keywords-panel">キーワード</button>
+              <button class="admin-subtab" type="button" data-admin-panel="admin-site-health-panel">サイト状態</button>
+              <button class="admin-subtab" type="button" data-admin-panel="admin-requests-panel">要望管理</button>
+            </div>
+            <section id="admin-keywords-panel" class="admin-subpanel active">
             <div class="pane-header">
               <div>
                 <h2 id="admin-keyword-detail-title">候補キーワード</h2>
                 <p id="admin-keyword-detail-meta">親キーワードを選択してください</p>
               </div>
             </div>
+            <div id="admin-parent-status" class="parent-status" hidden></div>
             <form id="add-candidate-form" class="inline-form">
               <input id="new-candidate-input" type="text" placeholder="候補キーワードを追加" disabled />
               <button id="add-candidate-button" type="submit" disabled>追加</button>
             </form>
             <div id="admin-candidate-list" class="candidate-list"></div>
+            </section>
+            <section id="admin-site-health-panel" class="admin-subpanel">
 
             <div class="pane-header admin-request-header">
               <div>
@@ -424,6 +434,8 @@
               </div>
             </div>
             <div id="site-health-list" class="request-list site-health-list"></div>
+            </section>
+            <section id="admin-requests-panel" class="admin-subpanel">
 
             <div class="pane-header admin-request-header">
               <div>
@@ -432,6 +444,7 @@
               </div>
             </div>
             <div id="admin-request-list" class="request-list admin-request-list"></div>
+            </section>
           </section>
         </section>
       </main>

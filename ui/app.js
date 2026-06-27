@@ -7,6 +7,7 @@ const state = {
   groupType: "company",
   targetView: "keyword-targets",
   adminGroupType: "company",
+  adminPanel: "admin-keywords-panel",
   articleSort: "published",
   companies: [],
   selectedCompany: null,
@@ -53,6 +54,8 @@ const els = {
   targetViewTabs: document.querySelectorAll(".target-view-tab"),
   targetPanels: document.querySelectorAll(".target-panel"),
   adminGroupTypeTabs: document.querySelectorAll(".admin-group-type-tab"),
+  adminSubtabs: document.querySelectorAll(".admin-subtab"),
+  adminSubpanels: document.querySelectorAll(".admin-subpanel"),
   companyCount: document.querySelector("#company-count"),
   viewerCacheStatus: document.querySelector("#viewer-cache-status"),
   companyList: document.querySelector("#company-list"),
@@ -79,12 +82,14 @@ const els = {
   candidateList: document.querySelector("#candidate-list"),
   keywordDetailTitle: document.querySelector("#keyword-detail-title"),
   keywordDetailMeta: document.querySelector("#keyword-detail-meta"),
+  keywordParentStatus: document.querySelector("#keyword-parent-status"),
   siteTargetCount: document.querySelector("#site-target-count"),
   siteTargetBody: document.querySelector("#site-target-body"),
   adminKeywordGroupList: document.querySelector("#admin-keyword-group-list"),
   adminCandidateList: document.querySelector("#admin-candidate-list"),
   adminKeywordDetailTitle: document.querySelector("#admin-keyword-detail-title"),
   adminKeywordDetailMeta: document.querySelector("#admin-keyword-detail-meta"),
+  adminParentStatus: document.querySelector("#admin-parent-status"),
   requestTocItems: document.querySelectorAll(".request-toc-item"),
   requestTocCount: document.querySelector("#request-toc-count"),
   addGroupForm: document.querySelector("#add-group-form"),
@@ -384,6 +389,16 @@ function setTargetView(viewId) {
   });
   els.targetPanels.forEach((panel) => {
     panel.classList.toggle("active", panel.id === viewId);
+  });
+}
+
+function setAdminPanel(panelId) {
+  state.adminPanel = panelId;
+  els.adminSubtabs.forEach((button) => {
+    button.classList.toggle("active", button.dataset.adminPanel === panelId);
+  });
+  els.adminSubpanels.forEach((panel) => {
+    panel.classList.toggle("active", panel.id === panelId);
   });
 }
 
@@ -970,6 +985,39 @@ async function loadKeywordTree() {
   }
 }
 
+function candidateEffectiveEnabled(group, candidate) {
+  return Boolean(group.enabled && candidate.enabled);
+}
+
+function effectiveStatusText(group, candidate) {
+  if (!group.enabled) return "親無効";
+  if (!candidate.enabled) return "無効";
+  return "有効";
+}
+
+function renderParentStatus(element, group) {
+  if (!element) return;
+  element.hidden = false;
+  element.className = `parent-status ${group.enabled ? "status-on" : "status-off"}`;
+  if (group.enabled) {
+    element.innerHTML = `親キーワード: <strong>有効</strong>。有効な候補キーワードが検索対象になります。`;
+    return;
+  }
+  element.innerHTML =
+    `親キーワード: <strong>無効</strong>。この配下の候補キーワードは検索対象外です。` +
+    `候補キーワードごとの個別設定は保持されています。`;
+}
+
+function candidateStatusBadges(group, candidate) {
+  const effectiveEnabled = candidateEffectiveEnabled(group, candidate);
+  const personalClass = candidate.enabled ? "status-on" : "status-off";
+  const effectiveClass = effectiveEnabled ? "status-on" : "status-off";
+  return `
+    <span class="status-badge ${personalClass}">個別: ${candidate.enabled ? "有効" : "無効"}</span>
+    <span class="status-badge ${effectiveClass}">実効: ${effectiveStatusText(group, candidate)}</span>
+  `;
+}
+
 function renderKeywordGroups() {
   els.keywordGroupList.innerHTML = "";
   for (const group of state.keywordGroups) {
@@ -996,6 +1044,7 @@ function selectKeywordGroup(baseKeywordId) {
   state.selectedKeywordGroup = group;
   renderKeywordGroups();
   els.keywordDetailTitle.textContent = group.base_keyword;
+  renderParentStatus(els.keywordParentStatus, group);
   els.keywordDetailMeta.textContent = `${groupTypeLabel(group.group_type)} / 候補 ${group.candidates.length}件`;
   renderCandidates(group);
 }
@@ -1008,11 +1057,14 @@ function renderCandidates(group) {
   els.candidateList.innerHTML = "";
   for (const candidate of group.candidates) {
     const row = document.createElement("div");
-    row.className = `candidate-row ${candidate.enabled ? "" : "disabled-row"}`;
+    const effectiveEnabled = candidateEffectiveEnabled(group, candidate);
+    row.className = `candidate-row ${effectiveEnabled ? "" : "effective-disabled"} ${
+      candidate.enabled ? "" : "disabled-row"
+    }`;
     row.innerHTML = `
       <div>
         <div class="keyword-name">${escapeText(candidate.candidate_keyword)}</div>
-        <div class="row-sub">${candidate.enabled ? "有効" : "無効"}</div>
+        <div class="row-sub">${candidateStatusBadges(group, candidate)}</div>
       </div>
     `;
     els.candidateList.appendChild(row);
@@ -1058,6 +1110,7 @@ function selectFirstAdminKeywordGroupForType() {
   state.adminSelectedKeywordGroup = null;
   els.adminKeywordDetailTitle.textContent = "候補キーワード";
   els.adminKeywordDetailMeta.textContent = `${groupTypeLabel(state.adminGroupType)}の親キーワードを選択してください`;
+  if (els.adminParentStatus) els.adminParentStatus.hidden = true;
   els.newCandidateInput.disabled = true;
   els.addCandidateButton.disabled = true;
   els.adminCandidateList.innerHTML = `<div class="empty">${groupTypeLabel(state.adminGroupType)}の親キーワードはありません</div>`;
@@ -1068,6 +1121,7 @@ function selectAdminKeywordGroup(baseKeywordId) {
   if (!group) return;
   state.adminSelectedKeywordGroup = group;
   els.adminKeywordDetailTitle.textContent = group.base_keyword;
+  renderParentStatus(els.adminParentStatus, group);
   els.adminKeywordDetailMeta.textContent = `${groupTypeLabel(group.group_type)} / 候補 ${group.candidates.length}件`;
   els.newCandidateInput.disabled = false;
   els.addCandidateButton.disabled = false;
@@ -1082,10 +1136,14 @@ function renderAdminCandidates(group) {
   els.adminCandidateList.innerHTML = "";
   for (const candidate of group.candidates) {
     const row = document.createElement("div");
-    row.className = `candidate-row ${candidate.enabled ? "" : "disabled-row"}`;
+    const effectiveEnabled = candidateEffectiveEnabled(group, candidate);
+    row.className = `candidate-row ${effectiveEnabled ? "" : "effective-disabled"} ${
+      candidate.enabled ? "" : "disabled-row"
+    }`;
     row.innerHTML = `
       <div>
         <div class="keyword-name">${escapeText(candidate.candidate_keyword)}</div>
+        <div class="row-sub">${candidateStatusBadges(group, candidate)}</div>
       </div>
       <button type="button" class="status-toggle">${candidate.enabled ? "無効化" : "有効化"}</button>
     `;
@@ -1315,6 +1373,10 @@ document.querySelectorAll(".tab").forEach((button) => {
 
 els.targetViewTabs.forEach((button) => {
   button.addEventListener("click", () => setTargetView(button.dataset.targetView));
+});
+
+els.adminSubtabs.forEach((button) => {
+  button.addEventListener("click", () => setAdminPanel(button.dataset.adminPanel));
 });
 
 els.requestTocItems.forEach((item, index) => {
