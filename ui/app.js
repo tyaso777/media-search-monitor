@@ -59,9 +59,7 @@ const els = {
   copyModeLabel: document.querySelector("#copy-mode-label"),
   copyUnitLabel: document.querySelector("#copy-unit-label"),
   copyDays: document.querySelector("#copy-days"),
-  copyValueDecrease: document.querySelector("#copy-value-decrease"),
-  copyValueIncrease: document.querySelector("#copy-value-increase"),
-  copyValueLabel: document.querySelector("#copy-value-label"),
+  copyValueInput: document.querySelector("#copy-value-input"),
   copyMarkdownButton: document.querySelector("#copy-markdown-button"),
   copyTopRecords: document.querySelector("#copy-top-records"),
   copyTargetCount: document.querySelector("#copy-target-count"),
@@ -616,19 +614,37 @@ function updateCopyPreview() {
   const isRecentMode = state.copyMode === "recent";
   const rows = isRecentMode ? rowsForMarkdownCopy() : rowsForTopRecordsMarkdownCopy();
   const value = isRecentMode ? currentCopyDays() : currentCopyTopRecords();
-  const minValue = isRecentMode ? 0 : 1;
   const days = currentCopyDays();
   const topRecords = currentCopyTopRecords();
   els.copyDays.value = String(days);
   els.copyTopRecords.value = String(topRecords);
-  els.copyValueLabel.textContent = String(value);
+  els.copyValueInput.value = String(value);
+  els.copyValueInput.min = isRecentMode ? "0" : "1";
+  els.copyValueInput.max = isRecentMode ? "3650" : "5000";
   els.copyModeLabel.textContent = isRecentMode ? "直近掲載日で" : "上位レコードで";
   els.copyUnitLabel.textContent = isRecentMode ? "日以内をコピー" : "件をコピー";
   els.copyTargetCount.textContent = `（対象 ${rows.length}件）`;
-  els.copyValueDecrease.disabled = value <= minValue;
   els.copyModeButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.copyMode === state.copyMode);
   });
+}
+
+function applyCopyValueInput() {
+  const normalized = els.copyValueInput.value.replace(/\D/g, "");
+  if (els.copyValueInput.value !== normalized) {
+    els.copyValueInput.value = normalized;
+  }
+  if (!normalized) {
+    els.copyStatus.textContent = "";
+    return;
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  if (state.copyMode === "top") {
+    setCopyTopRecords(Number.isFinite(parsed) ? parsed : 5);
+  } else {
+    setCopyDays(Number.isFinite(parsed) ? parsed : 1);
+  }
+  els.copyStatus.textContent = "";
 }
 
 function closeColumnFilterPopover() {
@@ -1393,22 +1409,8 @@ els.copyModeButtons.forEach((button) => {
     updateCopyPreview();
   });
 });
-els.copyValueDecrease.addEventListener("click", () => {
-  if (state.copyMode === "top") {
-    setCopyTopRecords(currentCopyTopRecords() - 1);
-  } else {
-    setCopyDays(currentCopyDays() - 1);
-  }
-  els.copyStatus.textContent = "";
-});
-els.copyValueIncrease.addEventListener("click", () => {
-  if (state.copyMode === "top") {
-    setCopyTopRecords(currentCopyTopRecords() + 1);
-  } else {
-    setCopyDays(currentCopyDays() + 1);
-  }
-  els.copyStatus.textContent = "";
-});
+els.copyValueInput.addEventListener("input", applyCopyValueInput);
+els.copyValueInput.addEventListener("change", applyCopyValueInput);
 els.articleLoadMoreButton.addEventListener("click", () => loadCompanyResults(true));
 els.tableWrap?.addEventListener("scroll", maybeAutoLoadMoreArticles);
 

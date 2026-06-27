@@ -631,38 +631,16 @@ input {
   stroke-linejoin: round;
 }
 
-.adj-inner {
-  display: inline-grid;
-  grid-template-columns: 30px minmax(32px, auto) 30px;
-  align-items: center;
-  overflow: hidden;
+.copy-num-input {
+  width: 64px;
+  min-height: 30px;
+  padding: 4px 8px;
   border: 1px solid #c8d0d9;
   border-radius: 6px;
   background: #ffffff;
-}
-
-.adj-inner button {
-  height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: #f8fafc;
-  font-weight: 700;
-}
-
-.adj-inner button:hover {
-  background: #eef3f8;
-}
-
-.adj-inner span {
-  min-width: 30px;
-  padding: 0 8px;
-  text-align: center;
-  font-weight: 650;
-}
-
-.copy-num {
   color: #1d2733;
+  font-weight: 650;
+  text-align: center;
 }
 
 .copy-btn {
@@ -758,10 +736,17 @@ input {
   font-size: 12px;
 }
 
+.article-table-shell {
+  min-height: 0;
+  padding: 12px 14px 14px;
+  background: #f8fafc;
+  display: grid;
+}
+
 .table-wrap {
   overflow: auto;
   min-height: 0;
-  padding: 12px 14px 14px;
+  padding: 0;
 }
 
 .site-target-table-wrap {
@@ -855,6 +840,27 @@ table {
   table-layout: fixed;
   overflow: hidden;
   background: #ffffff;
+}
+
+.article-table {
+  overflow: visible;
+}
+
+.article-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #eef2f6;
+  box-shadow: 0 1px 0 #d7dee7;
+}
+
+.article-table .column-filter-button {
+  background: #eef2f6;
+}
+
+.article-table .column-filter-button:hover,
+.article-table .column-filter-button.active {
+  background: #dfe8f1;
 }
 
 th,
