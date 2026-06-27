@@ -43,7 +43,7 @@
 | hokkaido_np | `.post_date` に `2026年6月18日 17:09`。 | `explicit_year_only`。 | 年付き日本語日付の共通正規化テスト。 |
 | kahoku | 実サイト確認では新しめの記事は `6月18日` のように年なし、少し古い記事は `2026年5月10日` のように年付き。記事URLには `20260608` や `20240501` のような日付が入る。 | `url_date_or_explicit_year`。表示が年なしでも、URL内 `yyyyMMdd` を優先する。URLにも年がなければ補完しない。 | URL内 `20240501` が `2024/05/01` になること、URL日付なしの `6月18日` は `NULL` になることを単体テスト。 |
 | toonippo | 実取得では本日分が `14:33更新` のように時刻だけで、記事ページ `datePublished=2026-06-21T14:33:43+09:00` と一致。別日分は `M/D` 表示になるため、時刻のみは本日分と判断可能。 | `current_day_if_time_only`。時刻だけは取得日当日として補完するが、年なし `M/D` は採用しない。 | `0:39更新 -> 2026/06/20`、`6/18 23:45更新 -> NULL` をサイト別テスト。 |
-| sakigake | `time[datetime]` に年付き日時。 | `machine_datetime`。属性値を優先。 | ルールサポート検査。 |
+| sakigake | `time[datetime]` に年付き日時。記事URLは `article.jsp?kc=...` が記事IDで、検索条件由来の `ptxt` / `pak` / `pnw` / `psel` 等が付く場合がある。 | `machine_datetime`。属性値を優先。canonical URLでは `kc` だけを保持し、検索条件パラメータは削除する。 | ルールサポート検査。`tests/test_url_utils.py` で `kc` だけを保持することを検査。 |
 | minyu | `.status .day` に `2026/06/18 17:03`。 | `explicit_year_only`。 | 年付きスラッシュ日付の共通正規化テスト。 |
 | shimotsuke | 実取得では本日分が `5:00` のように時刻だけで、記事ページ `datePublished=2026-06-21T05:00:00+09:00` と一致。別日分は `6/19 19:25` のような `M/D` 表示。page20/page33では昨年以前が `2025/9/26`、`2007/9/21` のように年付き表示。 | `current_day_or_current_year_if_yearless`。時刻だけは取得日当日、年なし `M/D` は取得年として補完し、年付き表示はその年を採用する。 | `20:30 -> 2026/06/20`、`6/18 17:03 -> 2026/06/18`、`2025/9/26 -> 2025/09/26` をサイト別テスト。 |
 | jomo | `time[datetime]` に `2026-06-18 18:03`。 | `machine_datetime`。属性値を優先。 | ルールサポート検査。 |
@@ -51,7 +51,7 @@
 | kanaloco | カード内 `p.info` に `2026年6月18日(木) 17:03`。 | selectorを `p.info` に修正し、`explicit_year_only`。 | 保存HTMLから `p.info` の年付き日付が抽出できることをfixtureテスト。 |
 | niigata_nippo | 表示は `6/18` でも `datetime` に年付き日時。 | `machine_datetime`。属性値を優先。 | ルールサポート検査。 |
 | kyoto_np | 表示は `6月18日` でも `datetime` に年付き日時。 | `machine_datetime`。属性値を優先。 | ルールサポート検査。 |
-| kobe_np | `2026年05月28日` のように年付き。古い記事も混在。 | `explicit_year_only`。 | 年付き日本語日付の共通正規化テスト。 |
+| kobe_np | `2026年05月28日` のように年付き。古い記事も混在。検索結果URLは `searching.kobe-np.co.jp/go.php` のリダイレクト型で、同じ `go` でも `rid` だけが異なるURLが同一記事に解決される。 | `explicit_year_only`。canonical URLでは `go` を保持し、`rid` を削除して同一リダイレクト先の記事を重複排除する。 | 年付き日本語日付の共通正規化テスト。`tests/test_url_utils.py` で `rid` だけが異なる神戸新聞検索URLが同じcanonicalになることを検査。 |
 | chugoku_np | `time[datetime]` に年付き日時。 | `machine_datetime`。属性値を優先。 | ルールサポート検査。 |
 | nishinippon | `2026/06/19 08:24` のように年付き。 | `explicit_year_only`。 | 年付きスラッシュ日付の共通正規化テスト。 |
 | kumamoto_nichi | カード内 `.y2024-news-list__date-wrap` に `2026年6月18日 17:21`。 | result itemを `.y2024-news-list__item` に絞り、`explicit_year_only`。 | 保存HTMLからカード内日付が抽出できることをfixtureテスト。 |
@@ -59,7 +59,7 @@
 | okinawa_times | カード内に `2026年6月18日`。 | `explicit_year_only`。 | 年付き日本語日付の共通正規化テスト。 |
 | iwate_np | `8時間前` と `2026年6月17日` が混在。 | `explicit_year_only`。相対表記は採用しない。 | 相対表記は共通テストで日付化しない方針。 |
 | fukui | `（2026年6月18日 午後9時07分）` のように年付き。 | `explicit_year_only`。日付部分のみ正規化。 | 年付き日本語日付の共通正規化テスト。 |
-| sanyo | 実取得した検索結果では `.post_date` に `2026年6月17日 19:53` のような年付き日付。 | `explicit_year_only`。年付き日本語日付のみ採用し、年なし・時刻のみは採用しない。 | 年付き日本語日付の共通正規化と、年なし・時刻のみが `NULL` になることを検査。 |
+| sanyo | 実取得した検索結果では `.post_date` に `2026年6月17日 19:53` のような年付き日付。検索結果経由の記事URLに検索語パラメータ `kw` が付く場合がある。 | `explicit_year_only`。年付き日本語日付のみ採用し、年なし・時刻のみは採用しない。canonical URLでは `kw` を削除する。 | 年付き日本語日付の共通正規化と、年なし・時刻のみが `NULL` になることを検査。`tests/test_url_utils.py` で `kw` を削除することを検査。 |
 | sanin_chuo | `time[datetime]` に年付き日時。 | `machine_datetime`。属性値を優先。 | ルールサポート検査。 |
 | topics | 表示は時刻だけの場合あり、`datetime` に年付き日時。 | `machine_datetime`。表示ではなく属性値を優先。 | ルールサポート検査。 |
 | kochi | `2026.06.18 17:03` のように年付きドット区切り。 | `explicit_year_only`。 | ドット区切り日付の共通正規化テスト。 |
@@ -67,7 +67,7 @@
 | saga_np | 表示は時刻や月日の場合あり、`datetime` に年付き日付。 | `machine_datetime`。属性値を優先。 | ルールサポート検査。 |
 | nikkan_kogyo | `.ttl .date` に年付き日付想定。 | `explicit_year_only`。年なしなら次回調査でrule変更。 | 年付きスラッシュ日付の共通正規化テスト。 |
 | kyodo | 検索結果カードは `main .main_archive__content`。タイトル/URLは `.main_archive__content--ttl`、掲載日は `time.main_date` に `2026.06.25 11:00` のようなドット区切り年付き日時で出る。 | `machine_datetime`。検索結果カード単位のCSS selectorで取得し、ドット区切り年付き日時を `yyyy/mm/dd` に正規化する。 | `tests/fixtures/kyodo_search_result.html` でカードselector、URL、`2026.06.25` の正規化を検査。 |
-| nikkei_business | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
+| nikkei_business | `time` / `.date` 想定。記事URLに導線パラメータ `i_cid` が付く場合がある。 | `machine_datetime`。年付き値のみ。canonical URLでは `i_cid` を削除する。 | ルールサポート検査。`tests/test_url_utils.py` で `i_cid` を削除することを検査。 |
 | nikkei_xtech | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
 | sbbit | `.crd_ttl-pubdate` に年付き日付想定。 | `explicit_year_only`。 | 年付き日付の共通正規化テスト。 |
 | nikkan_jidosha | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
