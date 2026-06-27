@@ -248,6 +248,29 @@ def init_db(conn: sqlite3.Connection) -> None:
             ON viewer_result_rows(group_id, published_days, cache_rank);
         CREATE INDEX IF NOT EXISTS idx_viewer_result_rows_group_hit
             ON viewer_result_rows(group_id, hit_days, cache_rank);
+        CREATE TABLE IF NOT EXISTS viewer_group_site_filters (
+            group_id TEXT NOT NULL,
+            site_id TEXT NOT NULL,
+            site_name TEXT NOT NULL,
+            hit_count INTEGER NOT NULL DEFAULT 0,
+            min_published_days INTEGER,
+            min_hit_days INTEGER,
+            rebuilt_at TEXT NOT NULL,
+            PRIMARY KEY (group_id, site_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_viewer_group_site_filters_group
+            ON viewer_group_site_filters(group_id, site_name);
+        CREATE TABLE IF NOT EXISTS viewer_group_keyword_filters (
+            group_id TEXT NOT NULL,
+            candidate_keyword TEXT NOT NULL,
+            hit_count INTEGER NOT NULL DEFAULT 0,
+            min_published_days INTEGER,
+            min_hit_days INTEGER,
+            rebuilt_at TEXT NOT NULL,
+            PRIMARY KEY (group_id, candidate_keyword)
+        );
+        CREATE INDEX IF NOT EXISTS idx_viewer_group_keyword_filters_group
+            ON viewer_group_keyword_filters(group_id, candidate_keyword);
         """
     )
     _ensure_column(conn, "keyword_groups", "group_type", "TEXT NOT NULL DEFAULT 'company'")
@@ -821,6 +844,8 @@ def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) 
     source_hit_count = conn.execute("SELECT COUNT(*) AS n FROM search_result_hits").fetchone()["n"]
     source_item_count = conn.execute("SELECT COUNT(*) AS n FROM search_result_items").fetchone()["n"]
     result_row_count = _rebuild_viewer_result_rows(conn, rebuilt_at, today)
+    site_filter_count = _rebuild_viewer_group_site_filters(conn, rebuilt_at, today)
+    keyword_filter_count = _rebuild_viewer_group_keyword_filters(conn, rebuilt_at, today)
     conn.execute(
         """
         INSERT INTO viewer_metadata (
@@ -854,6 +879,23 @@ def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) 
             error_message = excluded.error_message
         """,
         (rebuilt_at, source_hit_count, source_item_count, result_row_count),
+    )
+    conn.execute(
+        """
+        INSERT INTO viewer_metadata (
+            cache_name, rebuilt_at, source_hit_count, source_item_count,
+            row_count, status, error_message
+        )
+        VALUES ('filter_options', ?, ?, ?, ?, 'success', NULL)
+        ON CONFLICT(cache_name) DO UPDATE SET
+            rebuilt_at = excluded.rebuilt_at,
+            source_hit_count = excluded.source_hit_count,
+            source_item_count = excluded.source_item_count,
+            row_count = excluded.row_count,
+            status = excluded.status,
+            error_message = excluded.error_message
+        """,
+        (rebuilt_at, source_hit_count, source_item_count, site_filter_count + keyword_filter_count),
     )
     conn.commit()
 
@@ -931,6 +973,97 @@ def _rebuild_viewer_result_rows(conn: sqlite3.Connection, rebuilt_at: str, today
         )
         inserted += 1
     return inserted
+
+
+def _rebuild_viewer_group_site_filters(
+    conn: sqlite3.Connection, rebuilt_at: str, today: date
+) -> int:
+    """Pre-aggregate site filter options for each keyword group."""
+
+    rows = conn.execute(
+        """
+        SELECT
+            h.base_keyword_id AS group_id,
+            i.site_id,
+            COALESCE(s.site_name, i.site_id) AS site_name,
+            COUNT(DISTINCT i.result_item_id) AS hit_count,
+            MAX(NULLIF(i.published_date, '')) AS latest_published_date,
+            MAX(NULLIF(h.first_seen_at, '')) AS latest_hit_at
+        FROM search_result_hits h
+        JOIN search_result_items i ON i.result_item_id = h.result_item_id
+        JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
+        LEFT JOIN sites s ON s.site_id = i.site_id
+        WHERE kg.enabled = 1
+        GROUP BY h.base_keyword_id, i.site_id, COALESCE(s.site_name, i.site_id)
+        ORDER BY h.base_keyword_id, site_name
+        """
+    ).fetchall()
+
+    conn.execute("DELETE FROM viewer_group_site_filters")
+    for row in rows:
+        conn.execute(
+            """
+            INSERT INTO viewer_group_site_filters (
+                group_id, site_id, site_name, hit_count,
+                min_published_days, min_hit_days, rebuilt_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row["group_id"],
+                row["site_id"],
+                row["site_name"],
+                int(row["hit_count"] or 0),
+                _days_since(_parse_published_date(row["latest_published_date"]), today),
+                _days_since(_parse_iso_date_prefix(row["latest_hit_at"]), today),
+                rebuilt_at,
+            ),
+        )
+    return len(rows)
+
+
+def _rebuild_viewer_group_keyword_filters(
+    conn: sqlite3.Connection, rebuilt_at: str, today: date
+) -> int:
+    """Pre-aggregate candidate keyword filter options for each keyword group."""
+
+    rows = conn.execute(
+        """
+        SELECT
+            h.base_keyword_id AS group_id,
+            h.candidate_keyword,
+            COUNT(DISTINCT h.result_item_id) AS hit_count,
+            MAX(NULLIF(i.published_date, '')) AS latest_published_date,
+            MAX(NULLIF(h.first_seen_at, '')) AS latest_hit_at
+        FROM search_result_hits h
+        JOIN search_result_items i ON i.result_item_id = h.result_item_id
+        JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
+        WHERE kg.enabled = 1
+        GROUP BY h.base_keyword_id, h.candidate_keyword
+        ORDER BY h.base_keyword_id, h.candidate_keyword
+        """
+    ).fetchall()
+
+    conn.execute("DELETE FROM viewer_group_keyword_filters")
+    for row in rows:
+        conn.execute(
+            """
+            INSERT INTO viewer_group_keyword_filters (
+                group_id, candidate_keyword, hit_count,
+                min_published_days, min_hit_days, rebuilt_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                row["group_id"],
+                row["candidate_keyword"],
+                int(row["hit_count"] or 0),
+                _days_since(_parse_published_date(row["latest_published_date"]), today),
+                _days_since(_parse_iso_date_prefix(row["latest_hit_at"]), today),
+                rebuilt_at,
+            ),
+        )
+    return len(rows)
 
 
 def _date_from_datetime(value: datetime) -> date:

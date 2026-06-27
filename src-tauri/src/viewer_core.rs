@@ -1,5 +1,5 @@
 use chrono::{Local, NaiveDate};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, params_from_iter, types::Value, Connection, OptionalExtension};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
@@ -54,6 +54,27 @@ pub struct ArticleRow {
     hit_days: Option<i64>,
     candidate_keywords: String,
     snippet: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ArticlePage {
+    rows: Vec<ArticleRow>,
+    total: i64,
+}
+
+#[derive(Serialize)]
+pub struct FilterOptionRow {
+    value: String,
+    label: String,
+    hit_count: i64,
+    min_published_days: Option<i64>,
+    min_hit_days: Option<i64>,
+}
+
+#[derive(Serialize)]
+pub struct ArticleFilterOptions {
+    sites: Vec<FilterOptionRow>,
+    keywords: Vec<FilterOptionRow>,
 }
 
 #[derive(Serialize)]
@@ -589,7 +610,12 @@ fn table_exists(conn: &Connection, table_name: &str) -> Result<bool, String> {
 }
 
 fn invalidate_viewer_cache(conn: &Connection) -> Result<(), String> {
-    for table in ["viewer_group_summary", "viewer_result_rows"] {
+    for table in [
+        "viewer_group_summary",
+        "viewer_result_rows",
+        "viewer_group_site_filters",
+        "viewer_group_keyword_filters",
+    ] {
         if table_exists(conn, table)? {
             conn.execute(&format!("DELETE FROM {table}"), [])
                 .map_err(|err| err.to_string())?;
@@ -597,7 +623,7 @@ fn invalidate_viewer_cache(conn: &Connection) -> Result<(), String> {
     }
     if table_exists(conn, "viewer_metadata")? {
         conn.execute(
-            "DELETE FROM viewer_metadata WHERE cache_name IN ('group_summary', 'result_rows')",
+            "DELETE FROM viewer_metadata WHERE cache_name IN ('group_summary', 'result_rows', 'filter_options')",
             [],
         )
         .map_err(|err| err.to_string())?;
@@ -619,12 +645,58 @@ pub fn get_company_results(
     base_keyword_id: String,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<ArticleRow>, String> {
+    site_ids: Option<Vec<String>>,
+    candidate_keywords: Option<Vec<String>>,
+    title_filter: Option<String>,
+    snippet_filter: Option<String>,
+    published_days: Option<i64>,
+    hit_days: Option<i64>,
+    sort_column: Option<String>,
+    sort_direction: Option<String>,
+) -> Result<ArticlePage, String> {
     let conn = open_db(db_path)?;
     let limit = limit.unwrap_or(100).clamp(1, 5000);
     let offset = offset.unwrap_or(0).max(0);
     if viewer_result_rows_available_for_group(&conn, &base_keyword_id)? {
-        return get_cached_company_results(&conn, base_keyword_id, limit, offset);
+        return get_cached_company_results(
+            &conn,
+            base_keyword_id,
+            limit,
+            offset,
+            site_ids,
+            candidate_keywords,
+            title_filter,
+            snippet_filter,
+            published_days,
+            hit_days,
+            sort_column,
+            sort_direction,
+        );
+    }
+
+    if has_advanced_article_filters(
+        &site_ids,
+        &candidate_keywords,
+        &title_filter,
+        &snippet_filter,
+        published_days,
+        hit_days,
+        &sort_column,
+    ) {
+        return get_uncached_filtered_company_results(
+            &conn,
+            base_keyword_id,
+            limit,
+            offset,
+            site_ids,
+            candidate_keywords,
+            title_filter,
+            snippet_filter,
+            published_days,
+            hit_days,
+            sort_column,
+            sort_direction,
+        );
     }
 
     let mut stmt = conn
@@ -654,6 +726,13 @@ pub fn get_company_results(
             "#,
         )
         .map_err(|err| err.to_string())?;
+    let total = conn
+        .query_row(
+            "SELECT COUNT(DISTINCT result_item_id) FROM search_result_hits WHERE base_keyword_id = ?",
+            params![base_keyword_id],
+            |row| row.get(0),
+        )
+        .map_err(|err| err.to_string())?;
     let rows = stmt
         .query_map(params![base_keyword_id, limit, offset], |row| {
             let published_date: Option<String> = row.get(5)?;
@@ -674,8 +753,12 @@ pub fn get_company_results(
             })
         })
         .map_err(|err| err.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(|err| err.to_string())
+    Ok(ArticlePage {
+        rows: rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| err.to_string())?,
+        total,
+    })
 }
 
 fn get_cached_company_results(
@@ -683,9 +766,36 @@ fn get_cached_company_results(
     base_keyword_id: String,
     limit: i64,
     offset: i64,
-) -> Result<Vec<ArticleRow>, String> {
+    site_ids: Option<Vec<String>>,
+    candidate_keywords: Option<Vec<String>>,
+    title_filter: Option<String>,
+    snippet_filter: Option<String>,
+    published_days: Option<i64>,
+    hit_days: Option<i64>,
+    sort_column: Option<String>,
+    sort_direction: Option<String>,
+) -> Result<ArticlePage, String> {
+    let (where_sql, values) = article_filter_where_sql(
+        "viewer_result_rows",
+        base_keyword_id,
+        site_ids,
+        candidate_keywords,
+        title_filter,
+        snippet_filter,
+        published_days,
+        hit_days,
+    );
+    let count_sql = format!("SELECT COUNT(*) FROM viewer_result_rows WHERE {where_sql}");
+    let total: i64 = conn
+        .query_row(&count_sql, params_from_iter(values.iter()), |row| row.get(0))
+        .map_err(|err| err.to_string())?;
+
+    let order_sql = article_order_sql(sort_column.as_deref(), sort_direction.as_deref());
+    let mut query_values = values.clone();
+    query_values.push(Value::Integer(limit));
+    query_values.push(Value::Integer(offset));
     let mut stmt = conn
-        .prepare(
+        .prepare(&format!(
             r#"
             SELECT
                 result_item_id,
@@ -700,15 +810,15 @@ fn get_cached_company_results(
                 candidate_keywords,
                 snippet
             FROM viewer_result_rows
-            WHERE group_id = ?
-            ORDER BY cache_rank
+            WHERE {where_sql}
+            ORDER BY {order_sql}
             LIMIT ?
             OFFSET ?
-            "#,
-        )
+            "#
+        ))
         .map_err(|err| err.to_string())?;
     let rows = stmt
-        .query_map(params![base_keyword_id, limit, offset], |row| {
+        .query_map(params_from_iter(query_values.iter()), |row| {
             Ok(ArticleRow {
                 result_item_id: row.get(0)?,
                 site_id: row.get(1)?,
@@ -724,8 +834,422 @@ fn get_cached_company_results(
             })
         })
         .map_err(|err| err.to_string())?;
+    Ok(ArticlePage {
+        rows: rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| err.to_string())?,
+        total,
+    })
+}
+
+pub fn get_company_result_filters(
+    db_path: Option<String>,
+    base_keyword_id: String,
+) -> Result<ArticleFilterOptions, String> {
+    let conn = open_db(db_path)?;
+    Ok(ArticleFilterOptions {
+        sites: get_company_site_filter_options(&conn, &base_keyword_id)?,
+        keywords: get_company_keyword_filter_options(&conn, &base_keyword_id)?,
+    })
+}
+
+fn get_company_site_filter_options(
+    conn: &Connection,
+    base_keyword_id: &str,
+) -> Result<Vec<FilterOptionRow>, String> {
+    if table_exists(conn, "viewer_group_site_filters")? {
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM viewer_group_site_filters WHERE group_id = ?",
+                params![base_keyword_id],
+                |row| row.get(0),
+            )
+            .map_err(|err| err.to_string())?;
+        if count > 0 {
+            let mut stmt = conn
+                .prepare(
+                    r#"
+                    SELECT site_id, site_name, hit_count, min_published_days, min_hit_days
+                    FROM viewer_group_site_filters
+                    WHERE group_id = ?
+                    ORDER BY site_name
+                    "#,
+                )
+                .map_err(|err| err.to_string())?;
+            let rows = stmt
+                .query_map(params![base_keyword_id], |row| {
+                    Ok(FilterOptionRow {
+                        value: row.get(0)?,
+                        label: row.get(1)?,
+                        hit_count: row.get(2)?,
+                        min_published_days: row.get(3)?,
+                        min_hit_days: row.get(4)?,
+                    })
+                })
+                .map_err(|err| err.to_string())?;
+            return rows
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|err| err.to_string());
+        }
+    }
+
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT
+                i.site_id,
+                COALESCE(s.site_name, i.site_id) AS site_name,
+                COUNT(DISTINCT i.result_item_id) AS hit_count,
+                MAX(NULLIF(i.published_date, '')) AS latest_published_date,
+                MAX(NULLIF(h.first_seen_at, '')) AS latest_hit_at
+            FROM search_result_hits h
+            JOIN search_result_items i ON i.result_item_id = h.result_item_id
+            LEFT JOIN sites s ON s.site_id = i.site_id
+            WHERE h.base_keyword_id = ?
+            GROUP BY i.site_id, COALESCE(s.site_name, i.site_id)
+            ORDER BY site_name
+            "#,
+        )
+        .map_err(|err| err.to_string())?;
+    let rows = stmt
+        .query_map(params![base_keyword_id], |row| {
+            let latest_published: Option<String> = row.get(3)?;
+            let latest_hit: Option<String> = row.get(4)?;
+            Ok(FilterOptionRow {
+                value: row.get(0)?,
+                label: row.get(1)?,
+                hit_count: row.get(2)?,
+                min_published_days: days_since(parse_published_date(latest_published.as_deref())),
+                min_hit_days: latest_hit
+                    .as_deref()
+                    .and_then(parse_iso_date_prefix)
+                    .and_then(|date| days_since(Some(date))),
+            })
+        })
+        .map_err(|err| err.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|err| err.to_string())
+}
+
+fn get_company_keyword_filter_options(
+    conn: &Connection,
+    base_keyword_id: &str,
+) -> Result<Vec<FilterOptionRow>, String> {
+    if table_exists(conn, "viewer_group_keyword_filters")? {
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM viewer_group_keyword_filters WHERE group_id = ?",
+                params![base_keyword_id],
+                |row| row.get(0),
+            )
+            .map_err(|err| err.to_string())?;
+        if count > 0 {
+            let mut stmt = conn
+                .prepare(
+                    r#"
+                    SELECT candidate_keyword, hit_count, min_published_days, min_hit_days
+                    FROM viewer_group_keyword_filters
+                    WHERE group_id = ?
+                    ORDER BY candidate_keyword
+                    "#,
+                )
+                .map_err(|err| err.to_string())?;
+            let rows = stmt
+                .query_map(params![base_keyword_id], |row| {
+                    let keyword: String = row.get(0)?;
+                    Ok(FilterOptionRow {
+                        value: keyword.clone(),
+                        label: keyword,
+                        hit_count: row.get(1)?,
+                        min_published_days: row.get(2)?,
+                        min_hit_days: row.get(3)?,
+                    })
+                })
+                .map_err(|err| err.to_string())?;
+            return rows
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|err| err.to_string());
+        }
+    }
+
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT
+                h.candidate_keyword,
+                COUNT(DISTINCT h.result_item_id) AS hit_count,
+                MAX(NULLIF(i.published_date, '')) AS latest_published_date,
+                MAX(NULLIF(h.first_seen_at, '')) AS latest_hit_at
+            FROM search_result_hits h
+            JOIN search_result_items i ON i.result_item_id = h.result_item_id
+            WHERE h.base_keyword_id = ?
+            GROUP BY h.candidate_keyword
+            ORDER BY h.candidate_keyword
+            "#,
+        )
+        .map_err(|err| err.to_string())?;
+    let rows = stmt
+        .query_map(params![base_keyword_id], |row| {
+            let keyword: String = row.get(0)?;
+            let latest_published: Option<String> = row.get(2)?;
+            let latest_hit: Option<String> = row.get(3)?;
+            Ok(FilterOptionRow {
+                value: keyword.clone(),
+                label: keyword,
+                hit_count: row.get(1)?,
+                min_published_days: days_since(parse_published_date(latest_published.as_deref())),
+                min_hit_days: latest_hit
+                    .as_deref()
+                    .and_then(parse_iso_date_prefix)
+                    .and_then(|date| days_since(Some(date))),
+            })
+        })
+        .map_err(|err| err.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|err| err.to_string())
+}
+
+fn get_uncached_filtered_company_results(
+    conn: &Connection,
+    base_keyword_id: String,
+    limit: i64,
+    offset: i64,
+    site_ids: Option<Vec<String>>,
+    candidate_keywords: Option<Vec<String>>,
+    title_filter: Option<String>,
+    snippet_filter: Option<String>,
+    published_days: Option<i64>,
+    hit_days: Option<i64>,
+    sort_column: Option<String>,
+    sort_direction: Option<String>,
+) -> Result<ArticlePage, String> {
+    let cte_group_id = base_keyword_id.clone();
+    let cte = r#"
+        WITH result_rows AS (
+            SELECT
+                i.result_item_id,
+                i.site_id,
+                COALESCE(s.site_name, i.site_id) AS site_name,
+                i.title,
+                i.url,
+                i.published_date,
+                CASE
+                    WHEN i.published_date IS NULL OR i.published_date = '' THEN NULL
+                    ELSE CAST(julianday(date('now', 'localtime')) - julianday(REPLACE(i.published_date, '/', '-')) AS INTEGER)
+                END AS published_days,
+                MIN(h.first_seen_at) AS first_hit_at,
+                CASE
+                    WHEN MIN(h.first_seen_at) IS NULL OR MIN(h.first_seen_at) = '' THEN NULL
+                    ELSE CAST(julianday(date('now', 'localtime')) - julianday(substr(MIN(h.first_seen_at), 1, 10)) AS INTEGER)
+                END AS hit_days,
+                GROUP_CONCAT(DISTINCT h.candidate_keyword) AS candidate_keywords,
+                i.snippet,
+                h.base_keyword_id AS group_id,
+                ROW_NUMBER() OVER (
+                    ORDER BY
+                        CASE WHEN i.published_date IS NULL OR i.published_date = '' THEN 1 ELSE 0 END,
+                        i.published_date DESC,
+                        MIN(h.first_seen_at) DESC
+                ) AS cache_rank
+            FROM search_result_hits h
+            JOIN search_result_items i ON i.result_item_id = h.result_item_id
+            LEFT JOIN sites s ON s.site_id = i.site_id
+            WHERE h.base_keyword_id = ?
+            GROUP BY h.base_keyword_id, i.result_item_id
+        )
+    "#;
+    let (where_sql, mut values) = article_filter_where_sql(
+        "result_rows",
+        base_keyword_id,
+        site_ids,
+        candidate_keywords,
+        title_filter,
+        snippet_filter,
+        published_days,
+        hit_days,
+    );
+    values.insert(0, Value::Text(cte_group_id));
+    let count_sql = format!("{cte} SELECT COUNT(*) FROM result_rows WHERE {where_sql}");
+    let total: i64 = conn
+        .query_row(&count_sql, params_from_iter(values.iter()), |row| row.get(0))
+        .map_err(|err| err.to_string())?;
+
+    let order_sql = article_order_sql(sort_column.as_deref(), sort_direction.as_deref());
+    values.push(Value::Integer(limit));
+    values.push(Value::Integer(offset));
+    let sql = format!(
+        r#"
+        {cte}
+        SELECT
+            result_item_id,
+            site_id,
+            site_name,
+            title,
+            url,
+            published_date,
+            published_days,
+            first_hit_at,
+            hit_days,
+            candidate_keywords,
+            snippet
+        FROM result_rows
+        WHERE {where_sql}
+        ORDER BY {order_sql}
+        LIMIT ?
+        OFFSET ?
+        "#
+    );
+    let mut stmt = conn.prepare(&sql).map_err(|err| err.to_string())?;
+    let rows = stmt
+        .query_map(params_from_iter(values.iter()), |row| {
+            Ok(ArticleRow {
+                result_item_id: row.get(0)?,
+                site_id: row.get(1)?,
+                site_name: row.get(2)?,
+                title: row.get(3)?,
+                url: row.get(4)?,
+                published_date: row.get(5)?,
+                published_days: row.get(6)?,
+                first_hit_at: row.get(7)?,
+                hit_days: row.get(8)?,
+                candidate_keywords: row.get::<_, Option<String>>(9)?.unwrap_or_default(),
+                snippet: row.get(10)?,
+            })
+        })
+        .map_err(|err| err.to_string())?;
+    Ok(ArticlePage {
+        rows: rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| err.to_string())?,
+        total,
+    })
+}
+
+fn has_advanced_article_filters(
+    site_ids: &Option<Vec<String>>,
+    candidate_keywords: &Option<Vec<String>>,
+    title_filter: &Option<String>,
+    snippet_filter: &Option<String>,
+    published_days: Option<i64>,
+    hit_days: Option<i64>,
+    sort_column: &Option<String>,
+) -> bool {
+    !clean_values(site_ids.as_deref()).is_empty()
+        || !clean_values(candidate_keywords.as_deref()).is_empty()
+        || title_filter.as_deref().is_some_and(|value| !value.trim().is_empty())
+        || snippet_filter.as_deref().is_some_and(|value| !value.trim().is_empty())
+        || published_days.is_some()
+        || hit_days.is_some()
+        || sort_column.as_deref().is_some_and(|value| !value.trim().is_empty())
+}
+
+fn article_filter_where_sql(
+    table_alias: &str,
+    group_id: String,
+    site_ids: Option<Vec<String>>,
+    candidate_keywords: Option<Vec<String>>,
+    title_filter: Option<String>,
+    snippet_filter: Option<String>,
+    published_days: Option<i64>,
+    hit_days: Option<i64>,
+) -> (String, Vec<Value>) {
+    let mut clauses = vec![format!("{table_alias}.group_id = ?")];
+    let mut values = vec![Value::Text(group_id)];
+
+    let sites = clean_values(site_ids.as_deref());
+    if !sites.is_empty() {
+        clauses.push(format!("{table_alias}.site_id IN ({})", placeholders(sites.len())));
+        values.extend(sites.into_iter().map(Value::Text));
+    }
+
+    let keywords = clean_values(candidate_keywords.as_deref());
+    if !keywords.is_empty() {
+        clauses.push(format!(
+            "EXISTS (
+                SELECT 1
+                FROM search_result_hits h_kw
+                WHERE h_kw.result_item_id = {table_alias}.result_item_id
+                  AND h_kw.base_keyword_id = {table_alias}.group_id
+                  AND h_kw.candidate_keyword IN ({})
+            )",
+            placeholders(keywords.len())
+        ));
+        values.extend(keywords.into_iter().map(Value::Text));
+    }
+
+    if let Some(value) = trimmed_filter(title_filter) {
+        clauses.push(format!("LOWER(COALESCE({table_alias}.title, '')) LIKE ?"));
+        values.push(Value::Text(format!("%{}%", value.to_lowercase())));
+    }
+    if let Some(value) = trimmed_filter(snippet_filter) {
+        clauses.push(format!("LOWER(COALESCE({table_alias}.snippet, '')) LIKE ?"));
+        values.push(Value::Text(format!("%{}%", value.to_lowercase())));
+    }
+    if let Some(days) = published_days {
+        clauses.push(format!(
+            "{table_alias}.published_days IS NOT NULL AND {table_alias}.published_days <= ?"
+        ));
+        values.push(Value::Integer(days.max(0)));
+    }
+    if let Some(days) = hit_days {
+        clauses.push(format!("{table_alias}.hit_days IS NOT NULL AND {table_alias}.hit_days <= ?"));
+        values.push(Value::Integer(days.max(0)));
+    }
+
+    (clauses.join(" AND "), values)
+}
+
+fn article_order_sql(sort_column: Option<&str>, sort_direction: Option<&str>) -> String {
+    let desc = matches!(sort_direction, Some("desc"));
+    match sort_column.unwrap_or("published") {
+        "hit" => {
+            if desc {
+                "CASE WHEN hit_days IS NULL THEN 1 ELSE 0 END, hit_days DESC, first_hit_at ASC, site_name ASC, title ASC".to_string()
+            } else {
+                "CASE WHEN hit_days IS NULL THEN 1 ELSE 0 END, hit_days ASC, first_hit_at DESC, site_name ASC, title ASC".to_string()
+            }
+        }
+        "site" => order_text("site_name", desc, "published_days ASC, title ASC"),
+        "title" => order_text("title", desc, "published_days ASC, site_name ASC"),
+        "keyword" => order_text("candidate_keywords", desc, "published_days ASC, title ASC"),
+        "snippet" => order_text("snippet", desc, "published_days ASC, title ASC"),
+        "published" => {
+            if desc {
+                "CASE WHEN published_days IS NULL THEN 1 ELSE 0 END, published_days DESC, published_date ASC, hit_days DESC, site_name ASC, title ASC".to_string()
+            } else {
+                "CASE WHEN published_days IS NULL THEN 1 ELSE 0 END, published_days ASC, published_date DESC, hit_days ASC, site_name ASC, title ASC".to_string()
+            }
+        }
+        _ => "cache_rank ASC".to_string(),
+    }
+}
+
+fn order_text(column: &str, desc: bool, tiebreaker: &str) -> String {
+    let direction = if desc { "DESC" } else { "ASC" };
+    format!("COALESCE({column}, '') {direction}, {tiebreaker}")
+}
+
+fn clean_values(values: Option<&[String]>) -> Vec<String> {
+    values
+        .unwrap_or(&[])
+        .iter()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn trimmed_filter(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn placeholders(count: usize) -> String {
+    std::iter::repeat("?")
+        .take(count)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn viewer_result_rows_available_for_group(

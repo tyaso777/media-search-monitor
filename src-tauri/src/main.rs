@@ -37,8 +37,37 @@ fn get_company_results(
     base_keyword_id: String,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<viewer_core::ArticleRow>, String> {
-    viewer_core::get_company_results(db_path, base_keyword_id, limit, offset)
+    site_ids: Option<Vec<String>>,
+    candidate_keywords: Option<Vec<String>>,
+    title_filter: Option<String>,
+    snippet_filter: Option<String>,
+    published_days: Option<i64>,
+    hit_days: Option<i64>,
+    sort_column: Option<String>,
+    sort_direction: Option<String>,
+) -> Result<viewer_core::ArticlePage, String> {
+    viewer_core::get_company_results(
+        db_path,
+        base_keyword_id,
+        limit,
+        offset,
+        site_ids,
+        candidate_keywords,
+        title_filter,
+        snippet_filter,
+        published_days,
+        hit_days,
+        sort_column,
+        sort_direction,
+    )
+}
+
+#[tauri::command]
+fn get_company_result_filters(
+    db_path: Option<String>,
+    base_keyword_id: String,
+) -> Result<viewer_core::ArticleFilterOptions, String> {
+    viewer_core::get_company_result_filters(db_path, base_keyword_id)
 }
 
 #[tauri::command]
@@ -179,6 +208,7 @@ fn main() {
             get_keyword_summaries,
             get_viewer_metadata,
             get_company_results,
+            get_company_result_filters,
             get_keyword_tree,
             add_keyword_group,
             add_keyword_group_typed,

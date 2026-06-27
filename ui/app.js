@@ -11,9 +11,14 @@ const state = {
   companies: [],
   selectedCompany: null,
   articleRows: [],
+  articleTotal: 0,
   articleLoading: false,
   articleFullyLoaded: false,
   articleRequestSequence: 0,
+  articleFilterOptions: {
+    sites: [],
+    keywords: [],
+  },
   viewerMetadata: null,
   selectedArticleKeywords: new Set(),
   copyMode: "recent",
@@ -463,10 +468,12 @@ async function selectCompany(baseKeywordId) {
   if (!company) return;
   state.selectedCompany = company;
   state.articleRows = [];
+  state.articleTotal = 0;
   state.articleLoading = false;
   state.articleFullyLoaded = false;
   state.articleRequestSequence += 1;
   state.selectedArticleKeywords = new Set();
+  state.articleFilterOptions = { sites: [], keywords: [] };
   resetColumnFilters();
   closeColumnFilterPopover();
   renderCompanies();
@@ -478,7 +485,36 @@ async function selectCompany(baseKeywordId) {
   renderArticleKeywordFilter();
   renderArticleLoadStatus();
 
+  await loadArticleFilterOptions();
   await loadCompanyResults(false);
+}
+
+async function loadArticleFilterOptions() {
+  if (!state.selectedCompany) return;
+  try {
+    state.articleFilterOptions = await invoke("get_company_result_filters", {
+      baseKeywordId: state.selectedCompany.base_keyword_id,
+    });
+  } catch (error) {
+    state.articleFilterOptions = { sites: [], keywords: [] };
+    els.dbStatus.textContent = `フィルター候補を読み込めませんでした: ${error}`;
+  }
+}
+
+function currentArticleQueryParams(append) {
+  return {
+    baseKeywordId: state.selectedCompany.base_keyword_id,
+    limit: ARTICLE_PAGE_SIZE,
+    offset: append ? state.articleRows.length : 0,
+    siteIds: [...state.columnFilters.site],
+    candidateKeywords: [...state.columnFilters.keyword],
+    titleFilter: state.columnFilters.title,
+    snippetFilter: state.columnFilters.snippet,
+    publishedDays: state.columnFilters.publishedDays,
+    hitDays: state.columnFilters.hitDays,
+    sortColumn: state.columnSort.column || state.articleSort,
+    sortDirection: state.columnSort.column ? state.columnSort.direction : "asc",
+  };
 }
 
 async function loadCompanyResults(append) {
@@ -491,14 +527,12 @@ async function loadCompanyResults(append) {
   state.articleLoading = true;
   renderArticleLoadStatus();
   try {
-    const rows = await invoke("get_company_results", {
-      baseKeywordId: requestedBaseKeywordId,
-      limit: ARTICLE_PAGE_SIZE,
-      offset: append ? state.articleRows.length : 0,
-    });
+    const page = await invoke("get_company_results", currentArticleQueryParams(append));
     if (state.articleRequestSequence !== requestSequence || state.selectedCompany?.base_keyword_id !== requestedBaseKeywordId) {
       return;
     }
+    const rows = page.rows || [];
+    state.articleTotal = page.total ?? rows.length;
     state.articleRows = append ? [...state.articleRows, ...rows] : rows;
     state.articleFullyLoaded = rows.length < ARTICLE_PAGE_SIZE;
     renderArticleKeywordFilter();
@@ -517,21 +551,15 @@ async function loadCompanyResults(append) {
 }
 
 function articleKeywordOptions() {
-  const counts = new Map();
-  for (const row of state.articleRows) {
-    for (const keyword of splitCandidateKeywords(row.candidate_keywords)) {
-      counts.set(keyword, (counts.get(keyword) ?? 0) + 1);
-    }
-  }
-  return [...counts.entries()].sort((a, b) => compareText(a[0], b[0]));
+  return (state.articleFilterOptions.keywords || [])
+    .map((option) => [option.value, option.hit_count, option.label])
+    .sort((a, b) => compareText(a[2] || a[0], b[2] || b[0]));
 }
 
 function siteOptions() {
-  const counts = new Map();
-  for (const row of state.articleRows) {
-    counts.set(row.site_name, (counts.get(row.site_name) ?? 0) + 1);
-  }
-  return [...counts.entries()].sort((a, b) => compareText(a[0], b[0]));
+  return (state.articleFilterOptions.sites || [])
+    .map((option) => [option.value, option.hit_count, option.label])
+    .sort((a, b) => compareText(a[2] || a[0], b[2] || b[0]));
 }
 
 function renderArticleKeywordFilter() {
@@ -540,41 +568,16 @@ function renderArticleKeywordFilter() {
 }
 
 function filteredArticleRows() {
-  const selected = state.selectedArticleKeywords;
-  const filters = state.columnFilters;
-  const titleText = filters.title.trim().toLocaleLowerCase();
-  const snippetText = filters.snippet.trim().toLocaleLowerCase();
-  const rows = state.articleRows.filter((row) => {
-    if (
-      selected.size > 0 &&
-      !splitCandidateKeywords(row.candidate_keywords).some((keyword) => selected.has(keyword))
-    ) {
-      return false;
-    }
-    if (filters.site.size > 0 && !filters.site.has(row.site_name)) return false;
-    if (
-      filters.keyword.size > 0 &&
-      !splitCandidateKeywords(row.candidate_keywords).some((keyword) => filters.keyword.has(keyword))
-    ) {
-      return false;
-    }
-    if (titleText && !String(row.title || "").toLocaleLowerCase().includes(titleText)) return false;
-    if (snippetText && !String(row.snippet || "").toLocaleLowerCase().includes(snippetText)) return false;
-    if (
-      filters.publishedDays !== null &&
-      (row.published_days === null || row.published_days === undefined || row.published_days > filters.publishedDays)
-    ) {
-      return false;
-    }
-    if (
-      filters.hitDays !== null &&
-      (row.hit_days === null || row.hit_days === undefined || row.hit_days > filters.hitDays)
-    ) {
-      return false;
-    }
-    return true;
-  });
-  return rows.sort(articleComparator);
+  return state.articleRows;
+}
+
+async function reloadArticleResults() {
+  state.articleRows = [];
+  state.articleTotal = 0;
+  state.articleFullyLoaded = false;
+  els.articleBody.innerHTML = `<tr><td colspan="6" class="empty">読み込み中</td></tr>`;
+  renderArticleLoadStatus();
+  await loadCompanyResults(false);
 }
 
 function rowsForMarkdownCopy() {
@@ -690,10 +693,10 @@ function renderColumnFilterPopover(column) {
     const selected = column === "site" ? state.columnFilters.site : state.columnFilters.keyword;
     const list = options
       .map(
-        ([value, count]) => `
+        ([value, count, label]) => `
           <label class="column-filter-check">
             <input type="checkbox" value="${escapeText(value)}" ${selected.has(value) ? "checked" : ""} />
-            <span>${escapeText(value)}</span>
+            <span>${escapeText(label || value)}</span>
             <em>${count}</em>
           </label>
         `,
@@ -734,33 +737,33 @@ function renderColumnFilterPopover(column) {
 
 function bindColumnFilterPopover(column) {
   const popover = els.columnFilterPopover;
-  popover.querySelector('[data-action="sort-asc"]')?.addEventListener("click", () => {
+  popover.querySelector('[data-action="sort-asc"]')?.addEventListener("click", async () => {
     state.columnSort = { column, direction: "asc" };
-    renderArticles();
+    await reloadArticleResults();
     closeColumnFilterPopover();
   });
-  popover.querySelector('[data-action="sort-desc"]')?.addEventListener("click", () => {
+  popover.querySelector('[data-action="sort-desc"]')?.addEventListener("click", async () => {
     state.columnSort = { column, direction: "desc" };
-    renderArticles();
+    await reloadArticleResults();
     closeColumnFilterPopover();
   });
-  popover.querySelector('[data-action="apply-days"]')?.addEventListener("click", () => {
+  popover.querySelector('[data-action="apply-days"]')?.addEventListener("click", async () => {
     const input = popover.querySelector('[data-role="days-filter"]');
     const parsed = Number.parseInt(input.value, 10);
     const value = Number.isFinite(parsed) ? Math.max(0, Math.min(3650, parsed)) : null;
     if (column === "published") state.columnFilters.publishedDays = value;
     if (column === "hit") state.columnFilters.hitDays = value;
-    renderArticles();
+    await reloadArticleResults();
     closeColumnFilterPopover();
   });
-  popover.querySelector('[data-action="apply-text"]')?.addEventListener("click", () => {
+  popover.querySelector('[data-action="apply-text"]')?.addEventListener("click", async () => {
     const input = popover.querySelector('[data-role="text-filter"]');
     if (column === "title") state.columnFilters.title = input.value;
     if (column === "snippet") state.columnFilters.snippet = input.value;
-    renderArticles();
+    await reloadArticleResults();
     closeColumnFilterPopover();
   });
-  popover.querySelector('[data-action="apply-checks"]')?.addEventListener("click", () => {
+  popover.querySelector('[data-action="apply-checks"]')?.addEventListener("click", async () => {
     const values = new Set(
       [...popover.querySelectorAll('.column-filter-check input:checked')].map((input) => input.value),
     );
@@ -770,7 +773,7 @@ function bindColumnFilterPopover(column) {
       state.selectedArticleKeywords = new Set(values);
       renderArticleKeywordFilter();
     }
-    renderArticles();
+    await reloadArticleResults();
     closeColumnFilterPopover();
   });
   popover.querySelector('[data-action="check-all"]')?.addEventListener("click", () => {
@@ -783,7 +786,7 @@ function bindColumnFilterPopover(column) {
       input.checked = false;
     });
   });
-  popover.querySelector('[data-action="clear"]')?.addEventListener("click", () => {
+  popover.querySelector('[data-action="clear"]')?.addEventListener("click", async () => {
     if (column === "published") state.columnFilters.publishedDays = null;
     if (column === "hit") state.columnFilters.hitDays = null;
     if (column === "site") state.columnFilters.site = new Set();
@@ -795,7 +798,7 @@ function bindColumnFilterPopover(column) {
     if (column === "title") state.columnFilters.title = "";
     if (column === "snippet") state.columnFilters.snippet = "";
     if (state.columnSort.column === column) state.columnSort = { column: null, direction: "asc" };
-    renderArticles();
+    await reloadArticleResults();
     closeColumnFilterPopover();
   });
   popover.querySelector('[data-role="option-search"]')?.addEventListener("input", (event) => {
@@ -911,7 +914,7 @@ function renderArticles() {
 
 function renderArticleLoadStatus() {
   if (!els.articleLoadStatus || !els.articleLoadMoreButton) return;
-  const total = state.selectedCompany?.article_count ?? 0;
+  const total = state.articleTotal || 0;
   const loaded = state.articleRows.length;
   if (state.articleLoading) {
     els.articleLoadStatus.textContent = "記事一覧を読み込み中";
@@ -925,7 +928,7 @@ function renderArticleLoadStatus() {
 }
 
 function canLoadMoreArticles() {
-  const total = state.selectedCompany?.article_count ?? 0;
+  const total = state.articleTotal || 0;
   return Boolean(
     state.selectedCompany &&
       !state.articleLoading &&
@@ -1354,6 +1357,8 @@ els.groupTypeTabs.forEach((button) => {
     state.groupType = button.dataset.groupType;
     state.selectedCompany = null;
     state.articleRows = [];
+    state.articleTotal = 0;
+    state.articleFilterOptions = { sites: [], keywords: [] };
     state.selectedArticleKeywords = new Set();
     resetColumnFilters();
     closeColumnFilterPopover();

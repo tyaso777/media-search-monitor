@@ -195,6 +195,18 @@ fn dispatch(command: &str, params: &Value) -> Result<Value, String> {
             req_string(params, "baseKeywordId", "base_keyword_id")?,
             opt_i64(params, "limit", "limit"),
             opt_i64(params, "offset", "offset"),
+            opt_string_array(params, "siteIds", "site_ids"),
+            opt_string_array(params, "candidateKeywords", "candidate_keywords"),
+            opt_string(params, "titleFilter", "title_filter"),
+            opt_string(params, "snippetFilter", "snippet_filter"),
+            opt_i64(params, "publishedDays", "published_days"),
+            opt_i64(params, "hitDays", "hit_days"),
+            opt_string(params, "sortColumn", "sort_column"),
+            opt_string(params, "sortDirection", "sort_direction"),
+        )),
+        "get_company_result_filters" => to_value(viewer_core::get_company_result_filters(
+            db_path,
+            req_string(params, "baseKeywordId", "base_keyword_id")?,
         )),
         "get_keyword_tree" => to_value(viewer_core::get_keyword_tree(db_path)),
         "add_keyword_group" => to_value(viewer_core::add_keyword_group(
@@ -293,6 +305,19 @@ fn opt_i64(params: &Value, camel: &str, snake: &str) -> Option<i64> {
         .get(camel)
         .or_else(|| params.get(snake))
         .and_then(|value| value.as_i64())
+}
+
+fn opt_string_array(params: &Value, camel: &str, snake: &str) -> Option<Vec<String>> {
+    let values = params.get(camel).or_else(|| params.get(snake))?.as_array()?;
+    Some(
+        values
+            .iter()
+            .filter_map(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+            .collect(),
+    )
 }
 
 fn req_bool(params: &Value, camel: &str, snake: &str) -> Result<bool, String> {

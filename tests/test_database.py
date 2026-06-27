@@ -191,6 +191,13 @@ def test_rebuild_viewer_cache_summarizes_keyword_groups(conn):
     topic_row = conn.execute("SELECT * FROM viewer_group_summary WHERE group_id = 'kwg_topic'").fetchone()
     metadata = conn.execute("SELECT * FROM viewer_metadata WHERE cache_name = 'group_summary'").fetchone()
     result_metadata = conn.execute("SELECT * FROM viewer_metadata WHERE cache_name = 'result_rows'").fetchone()
+    filter_metadata = conn.execute("SELECT * FROM viewer_metadata WHERE cache_name = 'filter_options'").fetchone()
+    site_filter = conn.execute(
+        "SELECT * FROM viewer_group_site_filters WHERE group_id = 'kwg_company'"
+    ).fetchone()
+    keyword_filters = conn.execute(
+        "SELECT candidate_keyword, hit_count FROM viewer_group_keyword_filters WHERE group_id = 'kwg_company' ORDER BY candidate_keyword"
+    ).fetchall()
 
     assert company["group_type"] == "company"
     assert company["article_count"] == 1
@@ -208,3 +215,12 @@ def test_rebuild_viewer_cache_summarizes_keyword_groups(conn):
     assert metadata["source_item_count"] == 2
     assert metadata["row_count"] == 2
     assert result_metadata["row_count"] == 2
+    assert filter_metadata["row_count"] == 5
+    assert site_filter["site_id"] == "site-a"
+    assert site_filter["hit_count"] == 1
+    assert site_filter["min_published_days"] == 2
+    assert site_filter["min_hit_days"] == 1
+    assert [(row["candidate_keyword"], row["hit_count"]) for row in keyword_filters] == [
+        ("Example", 1),
+        ("Example Alt", 1),
+    ]
