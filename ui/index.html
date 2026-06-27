@@ -21,7 +21,7 @@
 
       <nav class="tabs" aria-label="view tabs">
         <button class="tab active" type="button" data-view="results-view">検索結果</button>
-        <button class="tab" type="button" data-view="keywords-view">キーワード一覧</button>
+        <button class="tab" type="button" data-view="keywords-view">検索対象一覧</button>
         <button class="tab" type="button" data-view="requests-view">要望</button>
         <button class="tab" type="button" data-view="admin-view">管理</button>
       </nav>
@@ -152,26 +152,78 @@
           </section>
         </section>
 
-        <section id="keywords-view" class="view split-view">
-          <aside class="keyword-groups">
-            <div class="pane-header">
-              <div>
-                <h2>親キーワード</h2>
-                <p>閲覧専用</p>
-              </div>
-            </div>
-            <div id="keyword-group-list" class="keyword-list"></div>
-          </aside>
+        <section id="keywords-view" class="view target-view">
+          <div class="target-view-tabs" aria-label="検索対象種別">
+            <button class="target-view-tab active" type="button" data-target-view="keyword-targets">
+              <svg class="target-view-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                <path d="M3 6v5.17a2 2 0 0 0 .59 1.42l7.82 7.82a2 2 0 0 0 2.83 0l6.17 -6.17a2 2 0 0 0 0 -2.83l-7.82 -7.82a2 2 0 0 0 -1.42 -.59h-5.17a3 3 0 0 0 -3 3z" />
+              </svg>
+              <span>キーワード</span>
+            </button>
+            <button class="target-view-tab" type="button" data-target-view="site-targets">
+              <svg class="target-view-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 21h18" />
+                <path d="M5 21v-14l8 -4v18" />
+                <path d="M19 21v-10l-6 -4" />
+                <path d="M9 9v.01" />
+                <path d="M9 13v.01" />
+                <path d="M9 17v.01" />
+              </svg>
+              <span>サイト</span>
+            </button>
+          </div>
 
-          <section class="keyword-candidates">
+          <div id="keyword-targets" class="target-panel split-view active">
+            <aside class="keyword-groups">
+              <div class="pane-header">
+                <div>
+                  <h2>親キーワード</h2>
+                  <p>閲覧専用</p>
+                </div>
+              </div>
+              <div id="keyword-group-list" class="keyword-list"></div>
+            </aside>
+
+            <section class="keyword-candidates">
+              <div class="pane-header">
+                <div>
+                  <h2 id="keyword-detail-title">候補キーワード</h2>
+                  <p id="keyword-detail-meta">親キーワードを選択してください</p>
+                </div>
+              </div>
+              <div id="candidate-list" class="candidate-list"></div>
+            </section>
+          </div>
+
+          <div id="site-targets" class="target-panel site-targets-panel">
             <div class="pane-header">
               <div>
-                <h2 id="keyword-detail-title">候補キーワード</h2>
-                <p id="keyword-detail-meta">親キーワードを選択してください</p>
+                <h2>対象サイト</h2>
+                <p id="site-target-count">0件</p>
               </div>
             </div>
-            <div id="candidate-list" class="candidate-list"></div>
-          </section>
+            <div class="site-target-table-wrap">
+              <table class="site-target-table">
+                <thead>
+                  <tr>
+                    <th>サイト</th>
+                    <th>サイトID</th>
+                    <th>有効</th>
+                    <th>Playwright必須</th>
+                    <th>DBヒット</th>
+                    <th>DB件数</th>
+                    <th>最終エラー</th>
+                  </tr>
+                </thead>
+                <tbody id="site-target-body">
+                  <tr>
+                    <td colspan="7" class="empty">対象サイトを読み込み中</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </section>
 
         <section id="requests-view" class="view request-view">

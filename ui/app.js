@@ -5,6 +5,7 @@ const ARTICLE_PAGE_SIZE = 100;
 const state = {
   sort: "name",
   groupType: "company",
+  targetView: "keyword-targets",
   adminGroupType: "company",
   articleSort: "published",
   companies: [],
@@ -44,6 +45,8 @@ const els = {
   groupListTitle: document.querySelector("#group-list-title"),
   companySort: document.querySelector("#company-sort"),
   groupTypeTabs: document.querySelectorAll(".group-type-tab"),
+  targetViewTabs: document.querySelectorAll(".target-view-tab"),
+  targetPanels: document.querySelectorAll(".target-panel"),
   adminGroupTypeTabs: document.querySelectorAll(".admin-group-type-tab"),
   companyCount: document.querySelector("#company-count"),
   viewerCacheStatus: document.querySelector("#viewer-cache-status"),
@@ -73,6 +76,8 @@ const els = {
   candidateList: document.querySelector("#candidate-list"),
   keywordDetailTitle: document.querySelector("#keyword-detail-title"),
   keywordDetailMeta: document.querySelector("#keyword-detail-meta"),
+  siteTargetCount: document.querySelector("#site-target-count"),
+  siteTargetBody: document.querySelector("#site-target-body"),
   adminKeywordGroupList: document.querySelector("#admin-keyword-group-list"),
   adminCandidateList: document.querySelector("#admin-candidate-list"),
   adminKeywordDetailTitle: document.querySelector("#admin-keyword-detail-title"),
@@ -366,6 +371,16 @@ function isColumnFilterActive(column) {
 function updateColumnFilterIndicators() {
   els.columnFilterButtons.forEach((button) => {
     button.classList.toggle("active", isColumnFilterActive(button.dataset.column));
+  });
+}
+
+function setTargetView(viewId) {
+  state.targetView = viewId;
+  els.targetViewTabs.forEach((button) => {
+    button.classList.toggle("active", button.dataset.targetView === viewId);
+  });
+  els.targetPanels.forEach((panel) => {
+    panel.classList.toggle("active", panel.id === viewId);
   });
 }
 
@@ -1088,9 +1103,47 @@ async function loadSiteHealth() {
   try {
     state.siteHealthRows = await invoke("list_site_health", {});
     renderSiteHealth();
+    renderSiteTargets();
   } catch (error) {
     els.siteHealthList.innerHTML = `<div class="error">${escapeText(error)}</div>`;
+    if (els.siteTargetBody) {
+      els.siteTargetBody.innerHTML = `<tr><td colspan="7" class="error">${escapeText(error)}</td></tr>`;
+    }
+    if (els.siteTargetCount) els.siteTargetCount.textContent = "取得失敗";
   }
+}
+
+function renderSiteTargets() {
+  if (!els.siteTargetBody) return;
+  if (els.siteTargetCount) {
+    els.siteTargetCount.textContent = `${state.siteHealthRows.length}件`;
+  }
+  if (!state.siteHealthRows.length) {
+    els.siteTargetBody.innerHTML = `<tr><td colspan="7" class="empty">対象サイトはまだありません</td></tr>`;
+    return;
+  }
+  els.siteTargetBody.innerHTML = state.siteHealthRows
+    .map((row) => {
+      const hasDbHit = row.total_items > 0;
+      const latestError = row.latest_error_message
+        ? `${row.latest_error_type || ""} ${row.latest_error_message}`
+        : "-";
+      return `
+        <tr>
+          <td>
+            <div class="site-target-name">${escapeText(row.site_name)}</div>
+            <div class="row-sub">${siteHealthLabel(row.status)}</div>
+          </td>
+          <td><code>${escapeText(row.site_id)}</code></td>
+          <td><span class="status-badge ${row.enabled ? "status-on" : "status-off"}">${row.enabled ? "有効" : "無効"}</span></td>
+          <td>${row.requires_playwright ? "必要" : "不要"}</td>
+          <td><span class="status-badge ${hasDbHit ? "status-on" : "status-off"}">${hasDbHit ? "あり" : "なし"}</span></td>
+          <td>${row.total_items}</td>
+          <td class="site-target-error">${escapeText(latestError)}</td>
+        </tr>
+      `;
+    })
+    .join("");
 }
 
 function renderSiteHealth() {
@@ -1239,6 +1292,10 @@ document.querySelectorAll(".tab").forEach((button) => {
     button.classList.add("active");
     document.querySelector(`#${button.dataset.view}`).classList.add("active");
   });
+});
+
+els.targetViewTabs.forEach((button) => {
+  button.addEventListener("click", () => setTargetView(button.dataset.targetView));
 });
 
 els.requestTocItems.forEach((item, index) => {

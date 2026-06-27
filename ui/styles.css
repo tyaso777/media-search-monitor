@@ -175,7 +175,59 @@ main {
 }
 
 #keywords-view {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.target-view-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #dbe1e8;
+}
+
+.target-view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 126px;
+  justify-content: center;
+}
+
+.target-view-tab.active {
+  background: #1f5f99;
+  border-color: #1f5f99;
+  color: #ffffff;
+}
+
+.target-view-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 auto;
+}
+
+.target-panel {
+  display: none;
+  min-height: 0;
+}
+
+.target-panel.active {
+  display: grid;
+}
+
+#keyword-targets {
   grid-template-columns: 380px 1fr;
+}
+
+.site-targets-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+  background: #f8fafc;
+  min-width: 0;
 }
 
 #admin-view {
@@ -710,6 +762,63 @@ input {
   overflow: auto;
   min-height: 0;
   padding: 12px 14px 14px;
+}
+
+.site-target-table-wrap {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px 18px;
+}
+
+.site-target-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #dbe1e8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.site-target-table th,
+.site-target-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf1f5;
+  text-align: left;
+  vertical-align: top;
+}
+
+.site-target-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f6f7f1;
+  color: #344252;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.site-target-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.site-target-table code {
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 12px;
+  color: #415066;
+}
+
+.site-target-name {
+  font-weight: 650;
+  color: #1d2733;
+}
+
+.site-target-error {
+  max-width: 360px;
+  color: #667381;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .article-load-bar {
@@ -1254,6 +1363,16 @@ textarea {
   color: #7a4a12;
   font-size: 11px;
   white-space: nowrap;
+}
+
+.status-badge.status-on {
+  background: #e9f6ee;
+  color: #1d6b3c;
+}
+
+.status-badge.status-off {
+  background: #eef1f4;
+  color: #667381;
 }
 
 .implementer-comment {
