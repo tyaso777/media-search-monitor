@@ -16,6 +16,13 @@ from news_monitor.url_utils import canonicalize_url
 T = TypeVar("T")
 JST = timezone(timedelta(hours=9))
 VIEWER_RESULT_CACHE_LIMIT_PER_GROUP = 5000
+SITE_BACKOFF_DURATIONS = [
+    timedelta(minutes=10),
+    timedelta(minutes=30),
+    timedelta(hours=2),
+    timedelta(hours=12),
+    timedelta(hours=24),
+]
 
 
 def connect(db_path: Path, busy_timeout_seconds: int = 30) -> sqlite3.Connection:
@@ -151,6 +158,16 @@ def init_db(conn: sqlite3.Connection) -> None:
             candidate_keyword_id TEXT,
             reason TEXT NOT NULL,
             created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS site_crawl_backoff (
+            site_id TEXT PRIMARY KEY,
+            status_code INTEGER,
+            error_type TEXT NOT NULL,
+            error_message TEXT,
+            failure_count INTEGER NOT NULL,
+            backoff_until TEXT,
+            last_failed_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS site_requests (
             request_id TEXT PRIMARY KEY,
@@ -645,6 +662,96 @@ def record_skip(
             created_at,
         ),
     )
+
+
+def site_backoff_reason(status_code: int | None) -> str:
+    """Return the crawl skip reason used for site-level throttling."""
+
+    if status_code is None:
+        return "site_backoff"
+    return f"site_backoff_{status_code}"
+
+
+def active_site_backoff(
+    conn: sqlite3.Connection, site_id: str, now: str
+) -> sqlite3.Row | None:
+    """Return active site backoff row when the current time is before its retry time."""
+
+    row = conn.execute(
+        """
+        SELECT site_id, status_code, error_type, error_message, failure_count,
+               backoff_until, last_failed_at, updated_at
+        FROM site_crawl_backoff
+        WHERE site_id = ?
+        """,
+        (site_id,),
+    ).fetchone()
+    if row is None or not row["backoff_until"]:
+        return None
+    try:
+        backoff_until = datetime.fromisoformat(str(row["backoff_until"]))
+        now_dt = datetime.fromisoformat(now)
+        if backoff_until > now_dt:
+            return row
+    except ValueError:
+        if str(row["backoff_until"]) > now:
+            return row
+    return None
+
+
+def record_site_backoff(
+    conn: sqlite3.Connection,
+    site_id: str,
+    status_code: int | None,
+    error_type: str,
+    error_message: str,
+    failed_at: str,
+) -> None:
+    """Record a transient site-level crawl stop and compute the next retry time."""
+
+    current = conn.execute(
+        "SELECT failure_count FROM site_crawl_backoff WHERE site_id = ?",
+        (site_id,),
+    ).fetchone()
+    failure_count = int(current["failure_count"]) + 1 if current else 1
+    duration = SITE_BACKOFF_DURATIONS[
+        min(failure_count - 1, len(SITE_BACKOFF_DURATIONS) - 1)
+    ]
+    failed_dt = datetime.fromisoformat(failed_at)
+    backoff_until = (failed_dt + duration).isoformat(timespec="seconds")
+    conn.execute(
+        """
+        INSERT INTO site_crawl_backoff (
+            site_id, status_code, error_type, error_message, failure_count,
+            backoff_until, last_failed_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(site_id) DO UPDATE SET
+            status_code = excluded.status_code,
+            error_type = excluded.error_type,
+            error_message = excluded.error_message,
+            failure_count = excluded.failure_count,
+            backoff_until = excluded.backoff_until,
+            last_failed_at = excluded.last_failed_at,
+            updated_at = excluded.updated_at
+        """,
+        (
+            site_id,
+            status_code,
+            error_type,
+            error_message,
+            failure_count,
+            backoff_until,
+            failed_at,
+            failed_at,
+        ),
+    )
+
+
+def clear_site_backoff(conn: sqlite3.Connection, site_id: str) -> None:
+    """Clear site-level backoff after a successful fetch/persist cycle."""
+
+    conn.execute("DELETE FROM site_crawl_backoff WHERE site_id = ?", (site_id,))
 
 
 def count_rows(conn: sqlite3.Connection, table: str) -> int:

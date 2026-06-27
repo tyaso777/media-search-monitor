@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import httpx
+
 from news_monitor import database
 from news_monitor.config import load_app_config, load_sites
 from news_monitor.crawler import Crawler
@@ -21,6 +23,16 @@ class FailingFetcher:
         if site.site_id == "sample_news":
             raise RuntimeError("boom")
         return FetchResponse(url=url, html="")
+
+
+class StatusFailingFetcher:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+
+    def fetch(self, url, site):
+        request = httpx.Request("GET", url)
+        response = httpx.Response(self.status_code, request=request, text="blocked")
+        raise httpx.HTTPStatusError("blocked", request=request, response=response)
 
 
 class MappingFetcher:
@@ -75,6 +87,50 @@ def test_crawl_records_errors_and_continues(conn, repo_root):
     assert database.count_rows(conn, "search_runs") == 1
 
 
+def test_crawl_backs_off_site_after_403(conn, repo_root, fixture_html):
+    app_config = load_app_config(repo_root / "config" / "app.yaml")
+    from news_monitor.config import load_keywords
+
+    database.import_keywords(conn, load_keywords(repo_root / "config" / "keywords.csv")[:3])
+    sample_site = replace(
+        load_sites(repo_root / "config" / "sites.yaml")[0],
+        enabled=True,
+        requires_playwright=False,
+    )
+    database.import_sites(conn, [sample_site])
+
+    crawler = Crawler(
+        conn,
+        app_config,
+        static_fetcher=StatusFailingFetcher(403),
+        sleep_enabled=False,
+    )
+    crawler.crawl()
+
+    assert database.count_rows(conn, "fetch_errors") == 1
+    assert database.count_rows(conn, "crawl_skips") == 2
+    backoff = conn.execute("SELECT * FROM site_crawl_backoff WHERE site_id = 'sample_news'").fetchone()
+    assert backoff["status_code"] == 403
+    assert backoff["failure_count"] == 1
+    assert backoff["backoff_until"]
+    skip_reasons = [
+        row["reason"] for row in conn.execute("SELECT reason FROM crawl_skips ORDER BY created_at")
+    ]
+    assert skip_reasons == ["site_backoff_403", "site_backoff_403"]
+
+    retry_crawler = Crawler(
+        conn,
+        app_config,
+        static_fetcher=StaticFixtureFetcher(fixture_html),
+        sleep_enabled=False,
+    )
+    retry_crawler.crawl()
+
+    assert database.count_rows(conn, "search_result_items") == 0
+    assert database.count_rows(conn, "fetch_errors") == 1
+    assert database.count_rows(conn, "crawl_skips") == 5
+
+
 def test_crawl_fills_missing_date_from_article_page(conn, repo_root):
     app_config = load_app_config(repo_root / "config" / "app.yaml")
     from news_monitor.config import load_keywords
@@ -109,4 +165,3 @@ def test_crawl_fills_missing_date_from_article_page(conn, repo_root):
     row = conn.execute("SELECT published_date FROM search_result_items").fetchone()
     assert row["published_date"] == "2026/06/20"
     assert article_url in fetcher.urls
-

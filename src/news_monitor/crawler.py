@@ -142,13 +142,24 @@ class Crawler:
     ) -> None:
         """Crawl one site for all enabled candidate keywords."""
 
+        active_backoff = database.active_site_backoff(conn, site.site_id, utc_now())
+        if active_backoff is not None:
+            reason = database.site_backoff_reason(active_backoff["status_code"])
+            self._write_with_retry(
+                conn,
+                lambda: self._record_skips(conn, run_id, site, keywords, reason),
+            )
+            return
+
         article_date_lookups = 0
         article_date_cache: dict[str, str | None] = {}
-        for keyword in keywords:
+        for index, keyword in enumerate(keywords):
             if self._requires_playwright_runtime(site) and not self.app_config.playwright.enabled:
                 self._write_with_retry(
                     conn,
-                    lambda: self._record_skip(conn, run_id, site, keyword),
+                    lambda: self._record_skip(
+                        conn, run_id, site, keyword, "playwright_disabled"
+                    ),
                 )
                 continue
             query = encode_query(keyword["candidate_keyword"], site.query_encoding)
@@ -186,6 +197,10 @@ class Crawler:
                         conn, run_id, site, keyword, fetched.url, fetched_at, results
                     ),
                 )
+                self._write_with_retry(
+                    conn,
+                    lambda: self._clear_site_backoff(conn, site),
+                )
             except Exception as exc:
                 self._write_with_retry(
                     conn,
@@ -193,9 +208,39 @@ class Crawler:
                         conn, run_id, site, keyword, page_url, exc
                     ),
                 )
+                status_code = self._http_status_code(exc)
+                if status_code in {403, 429}:
+                    reason = database.site_backoff_reason(status_code)
+                    self._write_with_retry(
+                        conn,
+                        lambda exc=exc, status_code=status_code: self._record_site_backoff(
+                            conn, site, status_code, exc
+                        ),
+                    )
+                    remaining_keywords = keywords[index + 1 :]
+                    if remaining_keywords:
+                        self._write_with_retry(
+                            conn,
+                            lambda: self._record_skips(
+                                conn, run_id, site, remaining_keywords, reason
+                            ),
+                        )
+                    LOGGER.warning(
+                        "Stopped crawling %s until backoff expires after HTTP %s",
+                        site.site_id,
+                        status_code,
+                    )
+                    break
                 LOGGER.warning("Failed to crawl %s for %s: %s", site.site_id, query, exc)
             if self.sleep_enabled and site.rate_limit_seconds > 0:
                 time.sleep(site.rate_limit_seconds)
+
+    def _http_status_code(self, exc: Exception) -> int | None:
+        """Extract an HTTP status code from httpx-like exceptions."""
+
+        response = getattr(exc, "response", None)
+        status_code = getattr(response, "status_code", None)
+        return int(status_code) if isinstance(status_code, int) else None
 
     def _requires_playwright_runtime(self, site: SiteConfig) -> bool:
         """Return whether the configured fetch strategy needs Playwright enabled."""
@@ -373,8 +418,34 @@ class Crawler:
         )
         conn.commit()
 
+    def _record_site_backoff(
+        self, conn: sqlite3.Connection, site: SiteConfig, status_code: int, exc: Exception
+    ) -> None:
+        """Persist a site-level retry delay and commit it."""
+
+        database.record_site_backoff(
+            conn,
+            site.site_id,
+            status_code,
+            type(exc).__name__,
+            str(exc),
+            utc_now(),
+        )
+        conn.commit()
+
+    def _clear_site_backoff(self, conn: sqlite3.Connection, site: SiteConfig) -> None:
+        """Clear a previous backoff after a successful search page fetch."""
+
+        database.clear_site_backoff(conn, site.site_id)
+        conn.commit()
+
     def _record_skip(
-        self, conn: sqlite3.Connection, run_id: str, site: SiteConfig, keyword: sqlite3.Row
+        self,
+        conn: sqlite3.Connection,
+        run_id: str,
+        site: SiteConfig,
+        keyword: sqlite3.Row,
+        reason: str,
     ) -> None:
         """Persist one crawl skip and commit it."""
 
@@ -382,10 +453,25 @@ class Crawler:
             conn,
             run_id,
             utc_now(),
-            "playwright_disabled",
+            reason,
             site.site_id,
             keyword,
         )
+        conn.commit()
+
+    def _record_skips(
+        self,
+        conn: sqlite3.Connection,
+        run_id: str,
+        site: SiteConfig,
+        keywords: list[sqlite3.Row],
+        reason: str,
+    ) -> None:
+        """Persist multiple crawl skips in one transaction."""
+
+        created_at = utc_now()
+        for keyword in keywords:
+            database.record_skip(conn, run_id, created_at, reason, site.site_id, keyword)
         conn.commit()
 
     def _sites_to_crawl(self) -> list[SiteConfig]:
