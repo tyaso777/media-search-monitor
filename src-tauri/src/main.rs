@@ -36,8 +36,9 @@ fn get_company_results(
     db_path: Option<String>,
     base_keyword_id: String,
     limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<Vec<viewer_core::ArticleRow>, String> {
-    viewer_core::get_company_results(db_path, base_keyword_id, limit)
+    viewer_core::get_company_results(db_path, base_keyword_id, limit, offset)
 }
 
 #[tauri::command]

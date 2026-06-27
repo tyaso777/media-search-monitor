@@ -1,5 +1,7 @@
 import { invoke, isLocalViewer } from "./api.js";
 
+const ARTICLE_PAGE_SIZE = 100;
+
 const state = {
   sort: "name",
   groupType: "company",
@@ -8,6 +10,9 @@ const state = {
   companies: [],
   selectedCompany: null,
   articleRows: [],
+  articleLoading: false,
+  articleFullyLoaded: false,
+  articleRequestSequence: 0,
   viewerMetadata: null,
   selectedArticleKeywords: new Set(),
   copyMode: "recent",
@@ -59,6 +64,9 @@ const els = {
   copyTargetCount: document.querySelector("#copy-target-count"),
   copyStatus: document.querySelector("#copy-status"),
   articleBody: document.querySelector("#article-body"),
+  tableWrap: document.querySelector(".table-wrap"),
+  articleLoadStatus: document.querySelector("#article-load-status"),
+  articleLoadMoreButton: document.querySelector("#article-load-more-button"),
   columnFilterButtons: document.querySelectorAll(".column-filter-button"),
   columnFilterPopover: document.querySelector("#column-filter-popover"),
   keywordGroupList: document.querySelector("#keyword-group-list"),
@@ -431,6 +439,9 @@ async function selectCompany(baseKeywordId) {
   if (!company) return;
   state.selectedCompany = company;
   state.articleRows = [];
+  state.articleLoading = false;
+  state.articleFullyLoaded = false;
+  state.articleRequestSequence += 1;
   state.selectedArticleKeywords = new Set();
   resetColumnFilters();
   closeColumnFilterPopover();
@@ -441,16 +452,43 @@ async function selectCompany(baseKeywordId) {
   els.selectedHitMin.textContent = daysLabel(company.hit_min_days);
   els.articleBody.innerHTML = `<tr><td colspan="6" class="empty">読み込み中</td></tr>`;
   renderArticleKeywordFilter();
+  renderArticleLoadStatus();
 
+  await loadCompanyResults(false);
+}
+
+async function loadCompanyResults(append) {
+  if (!state.selectedCompany || state.articleLoading) return;
+  if (append && state.articleFullyLoaded) return;
+  const requestedBaseKeywordId = state.selectedCompany.base_keyword_id;
+  const requestSequence = state.articleRequestSequence + 1;
+  state.articleRequestSequence = requestSequence;
+  let loadedSuccessfully = false;
+  state.articleLoading = true;
+  renderArticleLoadStatus();
   try {
-    state.articleRows = await invoke("get_company_results", {
-      baseKeywordId: baseKeywordId,
-      limit: 5000,
+    const rows = await invoke("get_company_results", {
+      baseKeywordId: requestedBaseKeywordId,
+      limit: ARTICLE_PAGE_SIZE,
+      offset: append ? state.articleRows.length : 0,
     });
+    if (state.articleRequestSequence !== requestSequence || state.selectedCompany?.base_keyword_id !== requestedBaseKeywordId) {
+      return;
+    }
+    state.articleRows = append ? [...state.articleRows, ...rows] : rows;
+    state.articleFullyLoaded = rows.length < ARTICLE_PAGE_SIZE;
     renderArticleKeywordFilter();
     renderArticles();
+    loadedSuccessfully = true;
   } catch (error) {
     els.articleBody.innerHTML = `<tr><td colspan="6" class="error">${escapeText(error)}</td></tr>`;
+  } finally {
+    if (state.articleRequestSequence !== requestSequence) return;
+    state.articleLoading = false;
+    renderArticleLoadStatus();
+    if (loadedSuccessfully) {
+      maybeAutoLoadMoreArticles();
+    }
   }
 }
 
@@ -827,6 +865,41 @@ function renderArticles() {
     });
   });
   updateCopyPreview();
+}
+
+function renderArticleLoadStatus() {
+  if (!els.articleLoadStatus || !els.articleLoadMoreButton) return;
+  const total = state.selectedCompany?.article_count ?? 0;
+  const loaded = state.articleRows.length;
+  if (state.articleLoading) {
+    els.articleLoadStatus.textContent = "記事一覧を読み込み中";
+  } else if (!state.selectedCompany) {
+    els.articleLoadStatus.textContent = "";
+  } else {
+    els.articleLoadStatus.textContent = `表示 ${loaded} / ${total} 件`;
+  }
+  els.articleLoadMoreButton.hidden = !state.selectedCompany || loaded >= total || state.articleFullyLoaded;
+  els.articleLoadMoreButton.disabled = state.articleLoading;
+}
+
+function canLoadMoreArticles() {
+  const total = state.selectedCompany?.article_count ?? 0;
+  return Boolean(
+    state.selectedCompany &&
+      !state.articleLoading &&
+      !state.articleFullyLoaded &&
+      state.articleRows.length > 0 &&
+      state.articleRows.length < total,
+  );
+}
+
+function maybeAutoLoadMoreArticles() {
+  const scroller = els.tableWrap;
+  if (!scroller || !canLoadMoreArticles()) return;
+  const distanceToBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+  if (distanceToBottom <= 300) {
+    loadCompanyResults(true);
+  }
 }
 
 async function loadKeywordTree() {
@@ -1253,6 +1326,8 @@ els.copyValueIncrease.addEventListener("click", () => {
   }
   els.copyStatus.textContent = "";
 });
+els.articleLoadMoreButton.addEventListener("click", () => loadCompanyResults(true));
+els.tableWrap?.addEventListener("scroll", maybeAutoLoadMoreArticles);
 
 els.addGroupForm.addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -210,6 +210,10 @@ main {
   grid-template-rows: auto auto 1fr;
 }
 
+.article-pane {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
 .pane-header {
   min-height: 68px;
   display: flex;
@@ -688,6 +692,31 @@ input {
   overflow: auto;
   min-height: 0;
   padding: 12px 14px 14px;
+}
+
+.article-load-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 14px 12px;
+  color: #667381;
+  font-size: 12px;
+}
+
+.secondary-button {
+  min-height: 32px;
+  border: 1px solid #c8d0d9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1d2733;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 table {

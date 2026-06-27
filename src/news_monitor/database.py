@@ -15,6 +15,7 @@ from news_monitor.url_utils import canonicalize_url
 
 T = TypeVar("T")
 JST = timezone(timedelta(hours=9))
+VIEWER_RESULT_CACHE_LIMIT_PER_GROUP = 5000
 
 
 def connect(db_path: Path, busy_timeout_seconds: int = 30) -> sqlite3.Connection:
@@ -205,6 +206,31 @@ def init_db(conn: sqlite3.Connection) -> None:
             status TEXT NOT NULL,
             error_message TEXT
         );
+        CREATE TABLE IF NOT EXISTS viewer_result_rows (
+            row_id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            group_type TEXT NOT NULL DEFAULT 'company',
+            result_item_id TEXT NOT NULL,
+            cache_rank INTEGER NOT NULL,
+            site_id TEXT NOT NULL,
+            site_name TEXT NOT NULL,
+            title TEXT,
+            url TEXT NOT NULL,
+            published_date TEXT,
+            published_days INTEGER,
+            first_hit_at TEXT NOT NULL,
+            hit_days INTEGER,
+            candidate_keywords TEXT NOT NULL,
+            snippet TEXT,
+            rebuilt_at TEXT NOT NULL,
+            UNIQUE(group_id, result_item_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_viewer_result_rows_group_rank
+            ON viewer_result_rows(group_id, cache_rank);
+        CREATE INDEX IF NOT EXISTS idx_viewer_result_rows_group_published
+            ON viewer_result_rows(group_id, published_days, cache_rank);
+        CREATE INDEX IF NOT EXISTS idx_viewer_result_rows_group_hit
+            ON viewer_result_rows(group_id, hit_days, cache_rank);
         """
     )
     _ensure_column(conn, "keyword_groups", "group_type", "TEXT NOT NULL DEFAULT 'company'")
@@ -687,6 +713,7 @@ def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) 
 
     source_hit_count = conn.execute("SELECT COUNT(*) AS n FROM search_result_hits").fetchone()["n"]
     source_item_count = conn.execute("SELECT COUNT(*) AS n FROM search_result_items").fetchone()["n"]
+    result_row_count = _rebuild_viewer_result_rows(conn, rebuilt_at, today)
     conn.execute(
         """
         INSERT INTO viewer_metadata (
@@ -704,7 +731,99 @@ def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) 
         """,
         (rebuilt_at, source_hit_count, source_item_count, len(rows)),
     )
+    conn.execute(
+        """
+        INSERT INTO viewer_metadata (
+            cache_name, rebuilt_at, source_hit_count, source_item_count,
+            row_count, status, error_message
+        )
+        VALUES ('result_rows', ?, ?, ?, ?, 'success', NULL)
+        ON CONFLICT(cache_name) DO UPDATE SET
+            rebuilt_at = excluded.rebuilt_at,
+            source_hit_count = excluded.source_hit_count,
+            source_item_count = excluded.source_item_count,
+            row_count = excluded.row_count,
+            status = excluded.status,
+            error_message = excluded.error_message
+        """,
+        (rebuilt_at, source_hit_count, source_item_count, result_row_count),
+    )
     conn.commit()
+
+
+def _rebuild_viewer_result_rows(conn: sqlite3.Connection, rebuilt_at: str, today: date) -> int:
+    """Flatten article rows for fast viewer paging."""
+
+    rows = conn.execute(
+        """
+        SELECT
+            h.base_keyword_id AS group_id,
+            COALESCE(kg.group_type, 'company') AS group_type,
+            i.result_item_id,
+            i.site_id,
+            COALESCE(s.site_name, i.site_id) AS site_name,
+            i.title,
+            i.url,
+            i.published_date,
+            MIN(h.first_seen_at) AS first_hit_at,
+            GROUP_CONCAT(DISTINCT h.candidate_keyword) AS candidate_keywords,
+            i.snippet
+        FROM search_result_hits h
+        JOIN search_result_items i ON i.result_item_id = h.result_item_id
+        JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
+        LEFT JOIN sites s ON s.site_id = i.site_id
+        WHERE kg.enabled = 1
+        GROUP BY h.base_keyword_id, i.result_item_id
+        ORDER BY
+            h.base_keyword_id,
+            CASE WHEN i.published_date IS NULL OR i.published_date = '' THEN 1 ELSE 0 END,
+            i.published_date DESC,
+            first_hit_at DESC
+        """
+    ).fetchall()
+
+    conn.execute("DELETE FROM viewer_result_rows")
+    rank_by_group: dict[str, int] = {}
+    inserted = 0
+    for row in rows:
+        group_id = str(row["group_id"])
+        rank = rank_by_group.get(group_id, 0) + 1
+        rank_by_group[group_id] = rank
+        if rank > VIEWER_RESULT_CACHE_LIMIT_PER_GROUP:
+            continue
+
+        published_date = row["published_date"]
+        first_hit_at = row["first_hit_at"]
+        conn.execute(
+            """
+            INSERT INTO viewer_result_rows (
+                row_id, group_id, group_type, result_item_id, cache_rank,
+                site_id, site_name, title, url, published_date, published_days,
+                first_hit_at, hit_days, candidate_keywords, snippet, rebuilt_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                uuid.uuid4().hex,
+                group_id,
+                row["group_type"],
+                row["result_item_id"],
+                rank,
+                row["site_id"],
+                row["site_name"],
+                row["title"],
+                row["url"],
+                published_date,
+                _days_since(_parse_published_date(published_date), today),
+                first_hit_at,
+                _days_since(_parse_iso_date_prefix(first_hit_at), today),
+                row["candidate_keywords"] or "",
+                row["snippet"],
+                rebuilt_at,
+            ),
+        )
+        inserted += 1
+    return inserted
 
 
 def _date_from_datetime(value: datetime) -> date:

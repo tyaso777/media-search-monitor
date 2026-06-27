@@ -588,6 +588,23 @@ fn table_exists(conn: &Connection, table_name: &str) -> Result<bool, String> {
     .map_err(|err| err.to_string())
 }
 
+fn invalidate_viewer_cache(conn: &Connection) -> Result<(), String> {
+    for table in ["viewer_group_summary", "viewer_result_rows"] {
+        if table_exists(conn, table)? {
+            conn.execute(&format!("DELETE FROM {table}"), [])
+                .map_err(|err| err.to_string())?;
+        }
+    }
+    if table_exists(conn, "viewer_metadata")? {
+        conn.execute(
+            "DELETE FROM viewer_metadata WHERE cache_name IN ('group_summary', 'result_rows')",
+            [],
+        )
+        .map_err(|err| err.to_string())?;
+    }
+    Ok(())
+}
+
 fn compare_optional_days(a: Option<i64>, b: Option<i64>) -> Ordering {
     match (a, b) {
         (Some(a), Some(b)) => a.cmp(&b),
@@ -601,9 +618,15 @@ pub fn get_company_results(
     db_path: Option<String>,
     base_keyword_id: String,
     limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<Vec<ArticleRow>, String> {
     let conn = open_db(db_path)?;
-    let limit = limit.unwrap_or(300).clamp(1, 5000);
+    let limit = limit.unwrap_or(100).clamp(1, 5000);
+    let offset = offset.unwrap_or(0).max(0);
+    if viewer_result_rows_available_for_group(&conn, &base_keyword_id)? {
+        return get_cached_company_results(&conn, base_keyword_id, limit, offset);
+    }
+
     let mut stmt = conn
         .prepare(
             r#"
@@ -627,11 +650,12 @@ pub fn get_company_results(
                 i.published_date DESC,
                 first_hit_at DESC
             LIMIT ?
+            OFFSET ?
             "#,
         )
         .map_err(|err| err.to_string())?;
     let rows = stmt
-        .query_map(params![base_keyword_id, limit], |row| {
+        .query_map(params![base_keyword_id, limit, offset], |row| {
             let published_date: Option<String> = row.get(5)?;
             let first_hit_at: String = row.get(6)?;
             Ok(ArticleRow {
@@ -652,6 +676,73 @@ pub fn get_company_results(
         .map_err(|err| err.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|err| err.to_string())
+}
+
+fn get_cached_company_results(
+    conn: &Connection,
+    base_keyword_id: String,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<ArticleRow>, String> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT
+                result_item_id,
+                site_id,
+                site_name,
+                title,
+                url,
+                published_date,
+                published_days,
+                first_hit_at,
+                hit_days,
+                candidate_keywords,
+                snippet
+            FROM viewer_result_rows
+            WHERE group_id = ?
+            ORDER BY cache_rank
+            LIMIT ?
+            OFFSET ?
+            "#,
+        )
+        .map_err(|err| err.to_string())?;
+    let rows = stmt
+        .query_map(params![base_keyword_id, limit, offset], |row| {
+            Ok(ArticleRow {
+                result_item_id: row.get(0)?,
+                site_id: row.get(1)?,
+                site_name: row.get(2)?,
+                title: row.get(3)?,
+                url: row.get(4)?,
+                published_date: row.get(5)?,
+                published_days: row.get(6)?,
+                first_hit_at: row.get(7)?,
+                hit_days: row.get(8)?,
+                candidate_keywords: row.get(9)?,
+                snippet: row.get(10)?,
+            })
+        })
+        .map_err(|err| err.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|err| err.to_string())
+}
+
+fn viewer_result_rows_available_for_group(
+    conn: &Connection,
+    group_id: &str,
+) -> Result<bool, String> {
+    if !table_exists(conn, "viewer_result_rows")? {
+        return Ok(false);
+    }
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM viewer_result_rows WHERE group_id = ?",
+            params![group_id],
+            |row| row.get(0),
+        )
+        .map_err(|err| err.to_string())?;
+    Ok(count > 0)
 }
 
 pub fn get_keyword_tree(db_path: Option<String>) -> Result<Vec<KeywordGroupRow>, String> {
@@ -728,6 +819,7 @@ pub fn add_keyword_group(db_path: Option<String>, base_keyword: String) -> Resul
         params![id, base_keyword],
     )
     .map_err(|err| err.to_string())?;
+    invalidate_viewer_cache(&conn)?;
     Ok(())
 }
 
@@ -753,6 +845,7 @@ pub fn add_keyword_group_typed(
         params![id, base_keyword, group_type],
     )
     .map_err(|err| err.to_string())?;
+    invalidate_viewer_cache(&conn)?;
     Ok(())
 }
 
@@ -768,6 +861,7 @@ pub fn set_keyword_group_enabled(
         params![if enabled { 1 } else { 0 }, base_keyword_id],
     )
     .map_err(|err| err.to_string())?;
+    invalidate_viewer_cache(&conn)?;
     Ok(())
 }
 
@@ -799,6 +893,7 @@ pub fn add_candidate_keyword(
         params![id, base_keyword_id, candidate_keyword],
     )
     .map_err(|err| err.to_string())?;
+    invalidate_viewer_cache(&conn)?;
     Ok(())
 }
 
@@ -813,6 +908,7 @@ pub fn set_candidate_keyword_enabled(
         params![if enabled { 1 } else { 0 }, candidate_keyword_id],
     )
     .map_err(|err| err.to_string())?;
+    invalidate_viewer_cache(&conn)?;
     Ok(())
 }
 

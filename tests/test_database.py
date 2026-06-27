@@ -185,8 +185,12 @@ def test_rebuild_viewer_cache_summarizes_keyword_groups(conn):
     company = conn.execute(
         "SELECT * FROM viewer_group_summary WHERE group_id = 'kwg_company'"
     ).fetchone()
+    result_row = conn.execute(
+        "SELECT * FROM viewer_result_rows WHERE group_id = 'kwg_company'"
+    ).fetchone()
     topic_row = conn.execute("SELECT * FROM viewer_group_summary WHERE group_id = 'kwg_topic'").fetchone()
     metadata = conn.execute("SELECT * FROM viewer_metadata WHERE cache_name = 'group_summary'").fetchone()
+    result_metadata = conn.execute("SELECT * FROM viewer_metadata WHERE cache_name = 'result_rows'").fetchone()
 
     assert company["group_type"] == "company"
     assert company["article_count"] == 1
@@ -194,7 +198,13 @@ def test_rebuild_viewer_cache_summarizes_keyword_groups(conn):
     assert company["latest_published_date"] == "2026/06/25"
     assert company["published_min_days"] == 2
     assert company["hit_min_days"] == 1
+    assert result_row["result_item_id"] == "item-1"
+    assert result_row["cache_rank"] == 1
+    assert result_row["published_days"] == 2
+    assert result_row["hit_days"] == 1
+    assert result_row["candidate_keywords"] in ("Example,Example Alt", "Example Alt,Example")
     assert topic_row["group_type"] == "topic"
     assert metadata["source_hit_count"] == 3
     assert metadata["source_item_count"] == 2
     assert metadata["row_count"] == 2
+    assert result_metadata["row_count"] == 2

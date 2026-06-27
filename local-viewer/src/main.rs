@@ -194,6 +194,7 @@ fn dispatch(command: &str, params: &Value) -> Result<Value, String> {
             db_path,
             req_string(params, "baseKeywordId", "base_keyword_id")?,
             opt_i64(params, "limit", "limit"),
+            opt_i64(params, "offset", "offset"),
         )),
         "get_keyword_tree" => to_value(viewer_core::get_keyword_tree(db_path)),
         "add_keyword_group" => to_value(viewer_core::add_keyword_group(
