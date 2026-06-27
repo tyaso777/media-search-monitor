@@ -51,6 +51,10 @@ def test_load_sites(repo_root):
     assert logistics.result_item_selector == ".newsList .list"
     assert logistics.url_selector == ".list-heading p a[href^='https://www.logi-today.com/']"
     assert logistics.require_keyword_in_result is True
+    minyu = next(site for site in sites if site.site_id == "minyu")
+    assert minyu.search_url_template == "https://www.minyu-net.com/search?q={query}"
+    assert minyu.result_container_selector == "section.top-news.primary ul.thumbnail-list.wide"
+    assert minyu.result_item_selector == "li.column.column-sp"
 
 
 def test_load_keywords_uses_stable_uuid_style_internal_ids(repo_root):

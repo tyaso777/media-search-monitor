@@ -68,6 +68,51 @@ def test_kanaloco_fixture_extracts_year_qualified_card_dates(repo_root):
     assert normalize_published_date(results[0].published_date, None, sites["kanaloco"].date_rule)
 
 
+def test_minyu_scopes_results_to_search_thumbnail_list(repo_root):
+    sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
+    site = sites["minyu"]
+    html = """
+    <section class="top-news primary">
+      <h1 class="category-title">「トヨタ」の検索結果</h1>
+      <ul class="thumbnail-list wide">
+        <li class="column column-sp">
+          <div class="text-wrap">
+            <p class="title">
+              <a href="https://www.minyu-net.com/newspack/detail/2026062601001007">
+                トヨタ日産、大雨影響の工場再開
+              </a>
+            </p>
+            <div class="status"><p class="day">2026/06/26 13:16</p></div>
+          </div>
+        </li>
+      </ul>
+    </section>
+    <div class="ranking pc">
+      <a class="column column-sp" href="https://www.minyu-net.com/news/detail/2026062618341351545">
+        <div class="text-wrap">
+          <p class="title">上司にパワハラ、患者虐待...いわき病院の男性職員を停職処分</p>
+          <div class="status"><p class="day">2026/06/27 07:50</p></div>
+        </div>
+      </a>
+    </div>
+    """
+
+    assert site.result_container_selector == "section.top-news.primary ul.thumbnail-list.wide"
+    assert site.result_item_selector == "li.column.column-sp"
+
+    results = parse_search_results(
+        html,
+        site,
+        "https://www.minyu-net.com/search/?q=toyota",
+    )
+
+    assert len(results) == 1
+    assert results[0].title == "トヨタ日産、大雨影響の工場再開"
+    assert results[0].url == "https://www.minyu-net.com/newspack/detail/2026062601001007"
+    assert results[0].published_date == "2026/06/26 13:16"
+    assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2026/06/26"
+
+
 def test_kumamoto_fixture_extracts_year_qualified_card_dates(repo_root):
     sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
     html = (repo_root / "work" / "playwright_html" / "kumamoto_nichi_fixed.html").read_text(

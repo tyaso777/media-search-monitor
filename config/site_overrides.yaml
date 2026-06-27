@@ -103,13 +103,14 @@ overrides:
     notes: "Selectors verified against pilot static HTML."
 
   - site_id: minyu
-    result_item_selector: "li.column"
+    result_container_selector: "section.top-news.primary ul.thumbnail-list.wide"
+    result_item_selector: "li.column.column-sp"
     title_selector: "p.title a"
     url_selector: "p.title a[href*='/newspack/detail/'], p.title a[href*='/news/detail/']"
     date_selector: ".status .day"
     snippet_selector: "p"
     url_include_patterns: ["/newspack/detail/", "/news/detail/"]
-    notes: "Title-link selector verified against pilot static HTML."
+    notes: "Scoped to the search result thumbnail list to avoid ranking/sidebar article lists."
 
   - site_id: kobe_np
     result_item_selector: "#search_list li"

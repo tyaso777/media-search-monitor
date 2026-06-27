@@ -240,7 +240,7 @@ sites:
   - site_id: minyu
     site_name: 福島民友新聞
     enabled: true
-    search_url_template: "https://www.minyu-net.com/search/?q={query}"
+    search_url_template: "https://www.minyu-net.com/search?q={query}"
     query_encoding: "utf-8"
     requires_playwright: false
     result_item_selector: "article, .search-result, .article-list li, li"
