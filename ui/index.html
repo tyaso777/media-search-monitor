@@ -157,11 +157,53 @@
         </section>
 
         <section id="requests-view" class="view request-view">
-          <div class="request-grid">
-            <section class="panel">
+          <div class="request-layout">
+            <nav class="request-toc" aria-label="要望タブ内メニュー">
+              <div class="request-toc-label">要望メニュー</div>
+              <a class="request-toc-item" href="#site-request-section">
+                <svg class="toc-icon" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M4 19v-11.5a1.5 1.5 0 0 1 1.5 -1.5h13a1.5 1.5 0 0 1 1.5 1.5v11.5" />
+                  <path d="M7 19v-8h10v8" />
+                  <path d="M9 14h2" />
+                  <path d="M13 14h2" />
+                </svg>
+                <span class="toc-text">サイト追加要望</span>
+              </a>
+              <a class="request-toc-item" href="#keyword-request-section">
+                <svg class="toc-icon" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                  <path d="M3 6v5.17a2 2 0 0 0 .59 1.42l7.82 7.82a2 2 0 0 0 2.83 0l6.17 -6.17a2 2 0 0 0 0 -2.83l-7.82 -7.82a2 2 0 0 0 -1.42 -.59h-5.17a3 3 0 0 0 -3 3z" />
+                  <path d="M12 3h1.17a2 2 0 0 1 1.42 .59l6.82 6.82a2 2 0 0 1 0 2.83" />
+                </svg>
+                <span class="toc-text">キーワード変更要望</span>
+              </a>
+              <div class="request-toc-divider"></div>
+              <a class="request-toc-item" href="#request-list-section">
+                <svg class="toc-icon" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M9 6h11" />
+                  <path d="M9 12h11" />
+                  <path d="M9 18h11" />
+                  <path d="M5 6h.01" />
+                  <path d="M5 12h.01" />
+                  <path d="M5 18h.01" />
+                </svg>
+                <span class="toc-text">登録済み要望</span>
+                <span id="request-toc-count" class="toc-count">件数 0</span>
+              </a>
+            </nav>
+            <div class="request-content">
+              <section id="site-request-section" class="panel request-section">
               <div class="pane-header">
                 <div>
-                  <h2>サイト追加要望</h2>
+                  <h2>
+                    <svg class="section-icon" aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M4 19v-11.5a1.5 1.5 0 0 1 1.5 -1.5h13a1.5 1.5 0 0 1 1.5 1.5v11.5" />
+                      <path d="M7 19v-8h10v8" />
+                      <path d="M9 14h2" />
+                      <path d="M13 14h2" />
+                    </svg>
+                    サイト追加要望
+                  </h2>
                   <p>新聞社・業界メディアなど</p>
                 </div>
               </div>
@@ -190,10 +232,17 @@
               </form>
             </section>
 
-            <section class="panel">
+              <section id="keyword-request-section" class="panel request-section">
               <div class="pane-header">
                 <div>
-                  <h2>キーワード変更要望</h2>
+                  <h2>
+                    <svg class="section-icon" aria-hidden="true" viewBox="0 0 24 24">
+                      <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                      <path d="M3 6v5.17a2 2 0 0 0 .59 1.42l7.82 7.82a2 2 0 0 0 2.83 0l6.17 -6.17a2 2 0 0 0 0 -2.83l-7.82 -7.82a2 2 0 0 0 -1.42 -.59h-5.17a3 3 0 0 0 -3 3z" />
+                      <path d="M12 3h1.17a2 2 0 0 1 1.42 .59l6.82 6.82a2 2 0 0 1 0 2.83" />
+                    </svg>
+                    キーワード変更要望
+                  </h2>
                   <p>追加・削除は要望として登録</p>
                 </div>
               </div>
@@ -241,17 +290,27 @@
                 <button type="submit">要望を登録</button>
               </form>
             </section>
-          </div>
-
-          <section class="request-list-panel">
+              <section id="request-list-section" class="request-list-panel request-section">
             <div class="pane-header">
               <div>
-                <h2>要望一覧</h2>
+                <h2>
+                  <svg class="section-icon" aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M9 6h11" />
+                    <path d="M9 12h11" />
+                    <path d="M9 18h11" />
+                    <path d="M5 6h.01" />
+                    <path d="M5 12h.01" />
+                    <path d="M5 18h.01" />
+                  </svg>
+                  要望一覧
+                </h2>
                 <p>ステータスと実装者コメントを確認できます</p>
               </div>
             </div>
             <div id="request-list" class="request-list"></div>
-          </section>
+              </section>
+            </div>
+          </div>
         </section>
 
         <section id="admin-view" class="view admin-view">

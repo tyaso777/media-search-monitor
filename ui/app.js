@@ -77,6 +77,8 @@ const els = {
   adminCandidateList: document.querySelector("#admin-candidate-list"),
   adminKeywordDetailTitle: document.querySelector("#admin-keyword-detail-title"),
   adminKeywordDetailMeta: document.querySelector("#admin-keyword-detail-meta"),
+  requestTocItems: document.querySelectorAll(".request-toc-item"),
+  requestTocCount: document.querySelector("#request-toc-count"),
   addGroupForm: document.querySelector("#add-group-form"),
   newGroupType: document.querySelector("#new-group-type"),
   newGroupInput: document.querySelector("#new-group-input"),
@@ -278,6 +280,15 @@ function markdownEscape(value) {
     .replaceAll("\r", " ")
     .replaceAll("\n", " ")
     .trim();
+}
+
+function setActiveRequestTocItem(activeItem) {
+  els.requestTocItems.forEach((item) => item.classList.toggle("active", item === activeItem));
+}
+
+function updateRequestTocCount() {
+  if (!els.requestTocCount) return;
+  els.requestTocCount.textContent = `件数 ${state.siteRequests.length + state.keywordRequests.length}`;
 }
 
 function articleComparator(a, b) {
@@ -1063,9 +1074,11 @@ async function loadRequests() {
     ]);
     state.siteRequests = siteRequests;
     state.keywordRequests = keywordRequests;
+    updateRequestTocCount();
     renderRequestList();
     renderAdminRequestList();
   } catch (error) {
+    if (els.requestTocCount) els.requestTocCount.textContent = "件数 -";
     els.requestList.innerHTML = `<div class="error">${escapeText(error)}</div>`;
     els.adminRequestList.innerHTML = `<div class="error">${escapeText(error)}</div>`;
   }
@@ -1151,15 +1164,17 @@ function renderRequestList() {
   els.requestList.innerHTML = requests
     .map(
       (request) => `
-        <article class="request-card">
-          <div class="request-card-head">
-            <strong>${escapeText(request.title)}</strong>
+        <article class="request-card request-list-item">
+          <div>
+            <div class="request-list-item-title">${escapeText(request.title)}</div>
+            <div class="request-list-item-meta">${escapeText(request.kind === "site" ? "サイト追加" : "キーワード変更")} / ${escapeText(request.detail)}</div>
+            <div class="request-list-item-meta">${escapeText(request.requester || "-")} ${escapeText(request.email || "")}</div>
+            ${request.notes ? `<p>${escapeText(request.notes)}</p>` : ""}
+            ${request.comment ? `<div class="implementer-comment">${escapeText(request.comment)}</div>` : ""}
+          </div>
+          <div>
             <span class="status-badge">${statusLabel(request.status)}</span>
           </div>
-          <div class="row-sub">${escapeText(request.kind === "site" ? "サイト追加" : "キーワード変更")} / ${escapeText(request.detail)}</div>
-          <div class="request-meta">${escapeText(request.requester || "-")} ${escapeText(request.email || "")}</div>
-          ${request.notes ? `<p>${escapeText(request.notes)}</p>` : ""}
-          ${request.comment ? `<div class="implementer-comment">${escapeText(request.comment)}</div>` : ""}
         </article>
       `,
     )
@@ -1223,6 +1238,17 @@ document.querySelectorAll(".tab").forEach((button) => {
     document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
     button.classList.add("active");
     document.querySelector(`#${button.dataset.view}`).classList.add("active");
+  });
+});
+
+els.requestTocItems.forEach((item, index) => {
+  item.classList.toggle("active", index === 0);
+  item.addEventListener("click", (event) => {
+    event.preventDefault();
+    const target = document.querySelector(item.getAttribute("href"));
+    if (!target) return;
+    setActiveRequestTocItem(item);
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 });
 
