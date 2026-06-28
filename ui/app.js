@@ -21,6 +21,9 @@ const state = {
     keywords: [],
   },
   viewerMetadata: null,
+  viewerMetadataRequest: null,
+  companySummaryCache: new Map(),
+  companySummaryRequests: new Map(),
   selectedArticleKeywords: new Set(),
   copyMode: "recent",
   columnFilters: {
@@ -402,6 +405,66 @@ function setAdminPanel(panelId) {
   });
 }
 
+function companySummaryCacheKey(groupType, sort) {
+  return `${groupType}:${sort}`;
+}
+
+function invalidateCompanySummaryCache() {
+  state.companySummaryCache.clear();
+  state.companySummaryRequests.clear();
+  state.viewerMetadata = null;
+  state.viewerMetadataRequest = null;
+}
+
+async function getViewerMetadataCached() {
+  if (state.viewerMetadata) return state.viewerMetadata;
+  if (!state.viewerMetadataRequest) {
+    state.viewerMetadataRequest = invoke("get_viewer_metadata", {})
+      .then((metadata) => {
+        state.viewerMetadata = metadata;
+        state.viewerMetadataRequest = null;
+        return metadata;
+      })
+      .catch((error) => {
+        state.viewerMetadataRequest = null;
+        throw error;
+      });
+  }
+  return state.viewerMetadataRequest;
+}
+
+async function getCompanySummariesCached(groupType, sort) {
+  const key = companySummaryCacheKey(groupType, sort);
+  if (state.companySummaryCache.has(key)) {
+    return state.companySummaryCache.get(key);
+  }
+  if (!state.companySummaryRequests.has(key)) {
+    const request = invoke("get_keyword_summaries", { sort, groupType })
+      .then((companies) => {
+        state.companySummaryCache.set(key, companies);
+        state.companySummaryRequests.delete(key);
+        return companies;
+      })
+      .catch((error) => {
+        state.companySummaryRequests.delete(key);
+        throw error;
+      });
+    state.companySummaryRequests.set(key, request);
+  }
+  return state.companySummaryRequests.get(key);
+}
+
+function prefetchOtherGroupSummaries(groupType, sort) {
+  const otherGroupType = groupType === "company" ? "topic" : "company";
+  const key = companySummaryCacheKey(otherGroupType, sort);
+  if (state.companySummaryCache.has(key) || state.companySummaryRequests.has(key)) return;
+  window.setTimeout(() => {
+    getCompanySummariesCached(otherGroupType, sort).catch(() => {
+      // Prefetch is best effort; the foreground load will surface any error.
+    });
+  }, 0);
+}
+
 async function loadAll() {
   await Promise.all([loadStats(), loadCompanies(), loadKeywordTree(), loadRequests(), loadSiteHealth()]);
 }
@@ -416,18 +479,20 @@ async function loadStats() {
 }
 
 async function loadCompanies() {
+  const requestedGroupType = state.groupType;
+  const requestedSort = state.sort;
   els.groupListTitle.textContent = groupTypeLabel(state.groupType);
-  els.companyCount.textContent = "読み込み中";
-  els.viewerCacheStatus.textContent = "一覧データ: 読み込み中";
-  els.companyList.innerHTML = `<div class="company-loading">一覧データを読み込み中</div>`;
+  if (!state.companySummaryCache.has(companySummaryCacheKey(requestedGroupType, requestedSort))) {
+    els.companyCount.textContent = "読み込み中";
+    els.viewerCacheStatus.textContent = "一覧データ: 読み込み中";
+    els.companyList.innerHTML = `<div class="company-loading">一覧データを読み込み中</div>`;
+  }
   try {
     const [companies, metadata] = await Promise.all([
-      invoke("get_keyword_summaries", {
-        sort: state.sort,
-        groupType: state.groupType,
-      }),
-      invoke("get_viewer_metadata", {}),
+      getCompanySummariesCached(requestedGroupType, requestedSort),
+      getViewerMetadataCached(),
     ]);
+    if (state.groupType !== requestedGroupType || state.sort !== requestedSort) return;
     state.companies = companies;
     state.viewerMetadata = metadata;
     els.companyCount.textContent = `${state.companies.length}件`;
@@ -447,6 +512,7 @@ async function loadCompanies() {
         await selectCompany(state.companies[0].base_keyword_id);
       }
     }
+    prefetchOtherGroupSummaries(requestedGroupType, requestedSort);
   } catch (error) {
     els.companyList.innerHTML = `<div class="error">${escapeText(error)}</div>`;
     els.companyCount.textContent = "取得失敗";
@@ -1094,6 +1160,7 @@ function renderAdminKeywordGroups() {
         baseKeywordId: group.base_keyword_id,
         enabled: !group.enabled,
       });
+      invalidateCompanySummaryCache();
       await loadKeywordTree();
       await loadCompanies();
     });
@@ -1390,7 +1457,10 @@ els.requestTocItems.forEach((item, index) => {
   });
 });
 
-els.refreshButton.addEventListener("click", loadAll);
+els.refreshButton.addEventListener("click", () => {
+  invalidateCompanySummaryCache();
+  loadAll();
+});
 
 if (isLocalViewer() && els.shutdownButton) {
   els.shutdownButton.hidden = false;
@@ -1489,6 +1559,7 @@ els.addGroupForm.addEventListener("submit", async (event) => {
     baseKeyword: value,
     groupType: els.newGroupType.value,
   });
+  invalidateCompanySummaryCache();
   els.newGroupInput.value = "";
   await loadKeywordTree();
   await loadCompanies();
