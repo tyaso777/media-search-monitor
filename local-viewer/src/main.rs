@@ -1,7 +1,9 @@
 use serde::Serialize;
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -12,11 +14,13 @@ const INDEX_HTML: &str = include_str!("../../ui/index.html");
 const APP_JS: &str = include_str!("../../ui/app.js");
 const API_JS: &str = include_str!("../../ui/api.js");
 const STYLES_CSS: &str = include_str!("../../ui/styles.css");
+const CLIENT_CLOSE_GRACE: Duration = Duration::from_secs(3);
 
 fn main() -> Result<(), String> {
     let options = Options::from_args()?;
     let bind_address = format!("127.0.0.1:{}", options.port.unwrap_or(0));
     let listener = TcpListener::bind(&bind_address).map_err(|err| err.to_string())?;
+    let client_state = Arc::new(Mutex::new(ClientState::default()));
     let address = listener.local_addr().map_err(|err| err.to_string())?;
     let url = format!("http://{address}/");
     println!("News Monitor Local Viewer: {url}");
@@ -27,7 +31,7 @@ fn main() -> Result<(), String> {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                if let Err(err) = handle_connection(stream) {
+                if let Err(err) = handle_connection(stream, Arc::clone(&client_state)) {
                     eprintln!("request error: {err}");
                 }
             }
@@ -35,6 +39,12 @@ fn main() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[derive(Default)]
+struct ClientState {
+    active_clients: HashSet<String>,
+    shutdown_generation: u64,
 }
 
 struct Options {
@@ -73,12 +83,15 @@ impl Options {
     }
 }
 
-fn handle_connection(mut stream: TcpStream) -> Result<(), String> {
+fn handle_connection(
+    mut stream: TcpStream,
+    client_state: Arc<Mutex<ClientState>>,
+) -> Result<(), String> {
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|err| err.to_string())?;
     let request = read_request(&mut stream)?;
-    let response = route_request(&request);
+    let response = route_request(&request, client_state);
     stream
         .write_all(response.as_bytes())
         .map_err(|err| err.to_string())
@@ -153,7 +166,7 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
     buffer.windows(4).position(|window| window == b"\r\n\r\n")
 }
 
-fn route_request(request: &HttpRequest) -> String {
+fn route_request(request: &HttpRequest, client_state: Arc<Mutex<ClientState>>) -> String {
     if request.method == "GET" {
         return match request.path.as_str() {
             "/" | "/index.html" => ok("text/html; charset=utf-8", INDEX_HTML),
@@ -161,6 +174,22 @@ fn route_request(request: &HttpRequest) -> String {
             "/api.js" => ok("text/javascript; charset=utf-8", API_JS),
             "/styles.css" => ok("text/css; charset=utf-8", STYLES_CSS),
             _ => not_found(),
+        };
+    }
+
+    if request.method == "POST" && request.path == "/api/local-viewer/client-opened" {
+        let params = serde_json::from_str::<Value>(&request.body).unwrap_or_else(|_| json!({}));
+        return match mark_client_opened(&client_state, &params) {
+            Ok(()) => json_response(200, json!({ "ok": true })),
+            Err(error) => json_response(400, json!({ "ok": false, "error": error })),
+        };
+    }
+
+    if request.method == "POST" && request.path == "/api/local-viewer/client-closed" {
+        let params = serde_json::from_str::<Value>(&request.body).unwrap_or_else(|_| json!({}));
+        return match mark_client_closed(&client_state, &params) {
+            Ok(()) => json_response(200, json!({ "ok": true })),
+            Err(error) => json_response(400, json!({ "ok": false, "error": error })),
         };
     }
 
@@ -174,6 +203,48 @@ fn route_request(request: &HttpRequest) -> String {
     }
 
     method_not_allowed()
+}
+
+fn mark_client_opened(
+    client_state: &Arc<Mutex<ClientState>>,
+    params: &Value,
+) -> Result<(), String> {
+    let client_id = req_string(params, "clientId", "client_id")?;
+    let mut state = client_state.lock().map_err(|err| err.to_string())?;
+    state.active_clients.insert(client_id);
+    state.shutdown_generation = state.shutdown_generation.saturating_add(1);
+    Ok(())
+}
+
+fn mark_client_closed(
+    client_state: &Arc<Mutex<ClientState>>,
+    params: &Value,
+) -> Result<(), String> {
+    let client_id = req_string(params, "clientId", "client_id")?;
+    let generation = {
+        let mut state = client_state.lock().map_err(|err| err.to_string())?;
+        state.active_clients.remove(&client_id);
+        state.shutdown_generation = state.shutdown_generation.saturating_add(1);
+        if !state.active_clients.is_empty() {
+            return Ok(());
+        }
+        state.shutdown_generation
+    };
+    schedule_shutdown_if_still_closed(Arc::clone(client_state), generation);
+    Ok(())
+}
+
+fn schedule_shutdown_if_still_closed(client_state: Arc<Mutex<ClientState>>, generation: u64) {
+    thread::spawn(move || {
+        thread::sleep(CLIENT_CLOSE_GRACE);
+        let should_shutdown = match client_state.lock() {
+            Ok(state) => state.shutdown_generation == generation && state.active_clients.is_empty(),
+            Err(_) => false,
+        };
+        if should_shutdown {
+            std::process::exit(0);
+        }
+    });
 }
 
 fn dispatch(command: &str, params: &Value) -> Result<Value, String> {
@@ -308,7 +379,10 @@ fn opt_i64(params: &Value, camel: &str, snake: &str) -> Option<i64> {
 }
 
 fn opt_string_array(params: &Value, camel: &str, snake: &str) -> Option<Vec<String>> {
-    let values = params.get(camel).or_else(|| params.get(snake))?.as_array()?;
+    let values = params
+        .get(camel)
+        .or_else(|| params.get(snake))?
+        .as_array()?;
     Some(
         values
             .iter()

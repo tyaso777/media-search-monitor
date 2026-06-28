@@ -1467,6 +1467,7 @@ els.refreshButton.addEventListener("click", () => {
 });
 
 if (isLocalViewer() && els.shutdownButton) {
+  registerLocalViewerClient();
   els.shutdownButton.hidden = false;
   els.shutdownButton.addEventListener("click", async () => {
     const ok = window.confirm("News Monitor Local Viewerを終了します。ブラウザのタブも閉じてください。");
@@ -1481,6 +1482,36 @@ if (isLocalViewer() && els.shutdownButton) {
       els.dbStatus.textContent = `終了できませんでした: ${error}`;
     }
   });
+}
+
+function registerLocalViewerClient() {
+  const clientId =
+    window.crypto?.randomUUID?.() ||
+    `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const payload = JSON.stringify({ clientId });
+
+  fetch("/api/local-viewer/client-opened", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: payload,
+  }).catch(() => {});
+
+  const notifyClosed = () => {
+    const body = JSON.stringify({ clientId });
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: "application/json" });
+      navigator.sendBeacon("/api/local-viewer/client-closed", blob);
+      return;
+    }
+    fetch("/api/local-viewer/client-closed", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  };
+
+  window.addEventListener("pagehide", notifyClosed, { once: true });
 }
 
 els.companySort.addEventListener("change", async () => {
