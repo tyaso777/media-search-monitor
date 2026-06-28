@@ -199,6 +199,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             group_id TEXT PRIMARY KEY,
             group_name TEXT NOT NULL,
             group_type TEXT NOT NULL DEFAULT 'company',
+            enabled INTEGER NOT NULL DEFAULT 1,
             article_count INTEGER NOT NULL DEFAULT 0,
             site_count INTEGER NOT NULL DEFAULT 0,
             latest_published_date TEXT,
@@ -209,11 +210,11 @@ def init_db(conn: sqlite3.Connection) -> None:
             rebuilt_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_viewer_group_summary_type_name
-            ON viewer_group_summary(group_type, sort_name);
+            ON viewer_group_summary(group_type, enabled, sort_name);
         CREATE INDEX IF NOT EXISTS idx_viewer_group_summary_type_published
-            ON viewer_group_summary(group_type, published_min_days, sort_name);
+            ON viewer_group_summary(group_type, enabled, published_min_days, sort_name);
         CREATE INDEX IF NOT EXISTS idx_viewer_group_summary_type_hit
-            ON viewer_group_summary(group_type, hit_min_days, sort_name);
+            ON viewer_group_summary(group_type, enabled, hit_min_days, sort_name);
         CREATE TABLE IF NOT EXISTS viewer_metadata (
             cache_name TEXT PRIMARY KEY,
             rebuilt_at TEXT NOT NULL,
@@ -274,6 +275,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     _ensure_column(conn, "keyword_groups", "group_type", "TEXT NOT NULL DEFAULT 'company'")
+    _ensure_column(conn, "viewer_group_summary", "enabled", "INTEGER NOT NULL DEFAULT 1")
     conn.commit()
 
 
@@ -801,6 +803,7 @@ def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) 
             kg.base_keyword_id AS group_id,
             kg.base_keyword AS group_name,
             COALESCE(kg.group_type, 'company') AS group_type,
+            kg.enabled AS enabled,
             COUNT(DISTINCT i.result_item_id) AS article_count,
             COUNT(DISTINCT i.site_id) AS site_count,
             MAX(NULLIF(i.published_date, '')) AS latest_published_date,
@@ -808,8 +811,7 @@ def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) 
         FROM keyword_groups kg
         LEFT JOIN search_result_hits h ON h.base_keyword_id = kg.base_keyword_id
         LEFT JOIN search_result_items i ON i.result_item_id = h.result_item_id
-        WHERE kg.enabled = 1
-        GROUP BY kg.base_keyword_id, kg.base_keyword, COALESCE(kg.group_type, 'company')
+        GROUP BY kg.base_keyword_id, kg.base_keyword, COALESCE(kg.group_type, 'company'), kg.enabled
         """
     ).fetchall()
 
@@ -820,16 +822,17 @@ def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) 
         conn.execute(
             """
             INSERT INTO viewer_group_summary (
-                group_id, group_name, group_type, article_count, site_count,
+                group_id, group_name, group_type, enabled, article_count, site_count,
                 latest_published_date, latest_hit_at, published_min_days, hit_min_days,
                 sort_name, rebuilt_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 row["group_id"],
                 row["group_name"],
                 row["group_type"],
+                int(row["enabled"] or 0),
                 int(row["article_count"] or 0),
                 int(row["site_count"] or 0),
                 latest_published,
@@ -921,7 +924,6 @@ def _rebuild_viewer_result_rows(conn: sqlite3.Connection, rebuilt_at: str, today
         JOIN search_result_items i ON i.result_item_id = h.result_item_id
         JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
         LEFT JOIN sites s ON s.site_id = i.site_id
-        WHERE kg.enabled = 1
         GROUP BY h.base_keyword_id, i.result_item_id
         ORDER BY
             h.base_keyword_id,
@@ -993,7 +995,6 @@ def _rebuild_viewer_group_site_filters(
         JOIN search_result_items i ON i.result_item_id = h.result_item_id
         JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
         LEFT JOIN sites s ON s.site_id = i.site_id
-        WHERE kg.enabled = 1
         GROUP BY h.base_keyword_id, i.site_id, COALESCE(s.site_name, i.site_id)
         ORDER BY h.base_keyword_id, site_name
         """
@@ -1038,7 +1039,6 @@ def _rebuild_viewer_group_keyword_filters(
         FROM search_result_hits h
         JOIN search_result_items i ON i.result_item_id = h.result_item_id
         JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
-        WHERE kg.enabled = 1
         GROUP BY h.base_keyword_id, h.candidate_keyword
         ORDER BY h.base_keyword_id, h.candidate_keyword
         """

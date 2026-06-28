@@ -370,6 +370,40 @@ fn ensure_keyword_group_type_column(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+fn ensure_viewer_group_summary_enabled_column(conn: &Connection) -> Result<(), String> {
+    if !table_exists(conn, "viewer_group_summary")? {
+        return Ok(());
+    }
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(viewer_group_summary)")
+        .map_err(|err| err.to_string())?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|err| err.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| err.to_string())?;
+    if !columns.iter().any(|column| column == "enabled") {
+        conn.execute(
+            "ALTER TABLE viewer_group_summary ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1",
+            [],
+        )
+        .map_err(|err| err.to_string())?;
+        conn.execute(
+            r#"
+            UPDATE viewer_group_summary
+            SET enabled = COALESCE((
+                SELECT kg.enabled
+                FROM keyword_groups kg
+                WHERE kg.base_keyword_id = viewer_group_summary.group_id
+            ), 1)
+            "#,
+            [],
+        )
+        .map_err(|err| err.to_string())?;
+    }
+    Ok(())
+}
+
 fn ensure_request_tables(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         r#"
@@ -535,6 +569,7 @@ fn get_cached_companies_by_type(
     sort: Option<String>,
     group_type: String,
 ) -> Result<Vec<CompanySummary>, String> {
+    ensure_viewer_group_summary_enabled_column(conn)?;
     let mut stmt = conn
         .prepare(
             r#"
@@ -550,6 +585,7 @@ fn get_cached_companies_by_type(
                 hit_min_days
             FROM viewer_group_summary
             WHERE group_type = ?
+              AND enabled = 1
             "#,
         )
         .map_err(|err| err.to_string())?;
@@ -609,25 +645,65 @@ fn table_exists(conn: &Connection, table_name: &str) -> Result<bool, String> {
     .map_err(|err| err.to_string())
 }
 
-fn invalidate_viewer_cache(conn: &Connection) -> Result<(), String> {
-    for table in [
-        "viewer_group_summary",
-        "viewer_result_rows",
-        "viewer_group_site_filters",
-        "viewer_group_keyword_filters",
-    ] {
-        if table_exists(conn, table)? {
-            conn.execute(&format!("DELETE FROM {table}"), [])
-                .map_err(|err| err.to_string())?;
-        }
+fn viewer_group_summary_has_rows(conn: &Connection) -> Result<bool, String> {
+    if !table_exists(conn, "viewer_group_summary")? {
+        return Ok(false);
     }
-    if table_exists(conn, "viewer_metadata")? {
-        conn.execute(
-            "DELETE FROM viewer_metadata WHERE cache_name IN ('group_summary', 'result_rows', 'filter_options')",
-            [],
-        )
+    ensure_viewer_group_summary_enabled_column(conn)?;
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM viewer_group_summary", [], |row| {
+            row.get(0)
+        })
         .map_err(|err| err.to_string())?;
+    Ok(count > 0)
+}
+
+fn sync_viewer_group_summary_for_group(
+    conn: &Connection,
+    base_keyword_id: &str,
+) -> Result<(), String> {
+    if !viewer_group_summary_has_rows(conn)? {
+        return Ok(());
     }
+    let group = conn
+        .query_row(
+            r#"
+            SELECT base_keyword_id, base_keyword, COALESCE(group_type, 'company'), enabled
+            FROM keyword_groups
+            WHERE base_keyword_id = ?
+            "#,
+            params![base_keyword_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|err| err.to_string())?;
+    let Some((group_id, group_name, group_type, enabled)) = group else {
+        return Ok(());
+    };
+    conn.execute(
+        r#"
+        INSERT INTO viewer_group_summary (
+            group_id, group_name, group_type, enabled, article_count, site_count,
+            latest_published_date, latest_hit_at, published_min_days, hit_min_days,
+            sort_name, rebuilt_at
+        )
+        VALUES (?, ?, ?, ?, 0, 0, NULL, NULL, NULL, NULL, ?, datetime('now'))
+        ON CONFLICT(group_id) DO UPDATE SET
+            group_name = excluded.group_name,
+            group_type = excluded.group_type,
+            enabled = excluded.enabled,
+            sort_name = excluded.sort_name
+        "#,
+        params![group_id, group_name, group_type, enabled, group_name],
+    )
+    .map_err(|err| err.to_string())?;
     Ok(())
 }
 
@@ -787,7 +863,9 @@ fn get_cached_company_results(
     );
     let count_sql = format!("SELECT COUNT(*) FROM viewer_result_rows WHERE {where_sql}");
     let total: i64 = conn
-        .query_row(&count_sql, params_from_iter(values.iter()), |row| row.get(0))
+        .query_row(&count_sql, params_from_iter(values.iter()), |row| {
+            row.get(0)
+        })
         .map_err(|err| err.to_string())?;
 
     let order_sql = article_order_sql(sort_column.as_deref(), sort_direction.as_deref());
@@ -1071,7 +1149,9 @@ fn get_uncached_filtered_company_results(
     values.insert(0, Value::Text(cte_group_id));
     let count_sql = format!("{cte} SELECT COUNT(*) FROM result_rows WHERE {where_sql}");
     let total: i64 = conn
-        .query_row(&count_sql, params_from_iter(values.iter()), |row| row.get(0))
+        .query_row(&count_sql, params_from_iter(values.iter()), |row| {
+            row.get(0)
+        })
         .map_err(|err| err.to_string())?;
 
     let order_sql = article_order_sql(sort_column.as_deref(), sort_direction.as_deref());
@@ -1136,11 +1216,17 @@ fn has_advanced_article_filters(
 ) -> bool {
     !clean_values(site_ids.as_deref()).is_empty()
         || !clean_values(candidate_keywords.as_deref()).is_empty()
-        || title_filter.as_deref().is_some_and(|value| !value.trim().is_empty())
-        || snippet_filter.as_deref().is_some_and(|value| !value.trim().is_empty())
+        || title_filter
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+        || snippet_filter
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
         || published_days.is_some()
         || hit_days.is_some()
-        || sort_column.as_deref().is_some_and(|value| !value.trim().is_empty())
+        || sort_column
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
 }
 
 fn article_filter_where_sql(
@@ -1158,7 +1244,10 @@ fn article_filter_where_sql(
 
     let sites = clean_values(site_ids.as_deref());
     if !sites.is_empty() {
-        clauses.push(format!("{table_alias}.site_id IN ({})", placeholders(sites.len())));
+        clauses.push(format!(
+            "{table_alias}.site_id IN ({})",
+            placeholders(sites.len())
+        ));
         values.extend(sites.into_iter().map(Value::Text));
     }
 
@@ -1192,7 +1281,9 @@ fn article_filter_where_sql(
         values.push(Value::Integer(days.max(0)));
     }
     if let Some(days) = hit_days {
-        clauses.push(format!("{table_alias}.hit_days IS NOT NULL AND {table_alias}.hit_days <= ?"));
+        clauses.push(format!(
+            "{table_alias}.hit_days IS NOT NULL AND {table_alias}.hit_days <= ?"
+        ));
         values.push(Value::Integer(days.max(0)));
     }
 
@@ -1343,7 +1434,7 @@ pub fn add_keyword_group(db_path: Option<String>, base_keyword: String) -> Resul
         params![id, base_keyword],
     )
     .map_err(|err| err.to_string())?;
-    invalidate_viewer_cache(&conn)?;
+    sync_viewer_group_summary_for_group(&conn, &id)?;
     Ok(())
 }
 
@@ -1369,7 +1460,7 @@ pub fn add_keyword_group_typed(
         params![id, base_keyword, group_type],
     )
     .map_err(|err| err.to_string())?;
-    invalidate_viewer_cache(&conn)?;
+    sync_viewer_group_summary_for_group(&conn, &id)?;
     Ok(())
 }
 
@@ -1385,7 +1476,7 @@ pub fn set_keyword_group_enabled(
         params![if enabled { 1 } else { 0 }, base_keyword_id],
     )
     .map_err(|err| err.to_string())?;
-    invalidate_viewer_cache(&conn)?;
+    sync_viewer_group_summary_for_group(&conn, &base_keyword_id)?;
     Ok(())
 }
 
@@ -1417,7 +1508,6 @@ pub fn add_candidate_keyword(
         params![id, base_keyword_id, candidate_keyword],
     )
     .map_err(|err| err.to_string())?;
-    invalidate_viewer_cache(&conn)?;
     Ok(())
 }
 
@@ -1432,7 +1522,6 @@ pub fn set_candidate_keyword_enabled(
         params![if enabled { 1 } else { 0 }, candidate_keyword_id],
     )
     .map_err(|err| err.to_string())?;
-    invalidate_viewer_cache(&conn)?;
     Ok(())
 }
 

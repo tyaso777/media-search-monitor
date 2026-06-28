@@ -200,6 +200,7 @@ def test_rebuild_viewer_cache_summarizes_keyword_groups(conn):
     ).fetchall()
 
     assert company["group_type"] == "company"
+    assert company["enabled"] == 1
     assert company["article_count"] == 1
     assert company["site_count"] == 1
     assert company["latest_published_date"] == "2026/06/25"
@@ -211,6 +212,7 @@ def test_rebuild_viewer_cache_summarizes_keyword_groups(conn):
     assert result_row["hit_days"] == 1
     assert result_row["candidate_keywords"] in ("Example,Example Alt", "Example Alt,Example")
     assert topic_row["group_type"] == "topic"
+    assert topic_row["enabled"] == 1
     assert metadata["source_hit_count"] == 3
     assert metadata["source_item_count"] == 2
     assert metadata["row_count"] == 2
