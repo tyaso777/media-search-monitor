@@ -1,6 +1,7 @@
 # Documentation Index
 
-このディレクトリには、運用手順、サイト調査、実装方針、監査メモが混在しています。目的別には以下を見てください。
+このディレクトリには、運用手順、サイト調査、実装方針、監査メモを置いています。
+通常参照する正式資料と、過去の調査過程を残すための監査メモを分けています。
 
 ## まず読む資料
 
@@ -15,10 +16,7 @@
 |---|---|
 | [site_date_availability_review.md](site_date_availability_review.md) | 各サイトについて、検索結果画面で掲載日が取れるか、記事ページfallbackが必要か、相対日付があるか等をまとめた主レビュー表 |
 | [site_date_availability_review.html](site_date_availability_review.html) | 上記レビュー表のHTML版。ブラウザで確認しやすい版 |
-| [site_date_availability_matrix.md](site_date_availability_matrix.md) | 掲載日取得可否の全サイト調査結果。機械監査寄りの一覧 |
 | [site_date_rules.md](site_date_rules.md) | サイトごとの掲載日抽出ルール。どのselector/ルールで日付を解釈するか |
-| [site_date_location_audit.md](site_date_location_audit.md) | 各サイトで掲載日がHTML上のどこに出ているかを調べた監査メモ |
-| [title_trailing_date_audit.md](title_trailing_date_audit.md) | タイトル末尾に日付が出るパターンがあるかを調べた監査メモ |
 
 掲載日ルールを確認したい場合は、まず [site_date_availability_review.md](site_date_availability_review.md) を見て、実装ルールの詳細は [site_date_rules.md](site_date_rules.md) を見ます。
 
@@ -32,12 +30,22 @@
 
 サイト設定や取得方式を変える場合は、この3つを確認します。
 
-## 初期方針・対象メディア
+## 対象メディア
 
 | 資料 | 何が書いてあるか |
 |---|---|
-| [assumptions.md](assumptions.md) | 初期実装時の前提・スコープ外事項 |
 | [site_notes/initial_media_targets.md](site_notes/initial_media_targets.md) | 初期対象メディアの考え方・候補整理 |
+
+## 過去調査メモ
+
+正式資料に反映済み、または調査過程を残す目的の資料は [archive/](archive/) に置いています。
+
+| 資料 | 何が書いてあるか |
+|---|---|
+| [archive/site_date_availability_matrix.md](archive/site_date_availability_matrix.md) | 掲載日取得可否の機械監査寄り一覧。主資料は `site_date_availability_review.md` |
+| [archive/site_date_location_audit.md](archive/site_date_location_audit.md) | 各サイトで掲載日がHTML上のどこに出ているかを調べた監査メモ |
+| [archive/title_trailing_date_audit.md](archive/title_trailing_date_audit.md) | タイトル末尾に日付が出るパターンを調べた監査メモ |
+| [archive/assumptions.md](archive/assumptions.md) | 初期実装時の前提メモ。現行ルールはREADMEとsetup資料を参照 |
 
 ## どれを見ればよいか
 

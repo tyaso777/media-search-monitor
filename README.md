@@ -15,6 +15,7 @@ docs/setup_and_operation.md
 - Localhost viewer: Rust exeがlocalhostサーバーを起動し、既定ブラウザで同じUIを表示
 
 記事本文取得、ログイン突破、CAPTCHA回避、通知、スケジューラは範囲外です。
+法令、利用規約、認証、CAPTCHA、記事本文取得に関わる判断が必要になった場合は、実装を止めて人間が確認します。
 
 ## 利用者向け
 
@@ -59,6 +60,7 @@ uv run playwright install chromium
 ```
 
 Playwrightを使わないHTTP/Google CSE対象サイトだけならChromiumは不要です。ただし全サイトを対象にする運用では `--enable-playwright` とChromiumを用意してください。
+Playwright必須サイトは、`--enable-playwright` なしでは取得せず、スキップ理由を `crawl_skips` に記録します。
 
 ## DB初期化・設定import
 
@@ -103,7 +105,7 @@ uv run news-monitor crawl-and-report `
 
 ### Playwrightなし
 
-Chromiumを使わず、HTTP/Google CSEで取得できるサイトだけを対象にします。Playwright必須サイトはスキップされます。
+Chromiumを使わず、HTTP/Google CSEで取得できるサイトだけを対象にします。Playwright必須サイトはスキップされ、スキップ理由は `crawl_skips` に記録されます。
 
 ```powershell
 uv run news-monitor crawl-and-report `
@@ -277,6 +279,7 @@ local-viewer/target/release/news-monitor-local-viewer.exe
 ```
 
 起動すると `127.0.0.1` の空きポートでサーバーを立ち上げ、既定ブラウザを開きます。右上の `終了` ボタンでlocalhostサーバーを停止できます。
+また、localhost版で開いたブラウザタブをすべて閉じた場合も、数秒後にlocalhostサーバーは自動終了します。
 
 ブラウザを自動で開かない確認用途では以下も使えます。
 

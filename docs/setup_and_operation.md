@@ -136,7 +136,8 @@ local-viewer/target/release/news-monitor-local-viewer.exe
 ```
 
 起動すると、空きポートの `http://127.0.0.1:xxxxx/` を立ち上げ、既定ブラウザを自動で開きます。
-右上の `終了` ボタンでlocalhostサーバーを停止できます。その後、ブラウザのタブを閉じてください。
+右上の `終了` ボタンでlocalhostサーバーを停止できます。
+また、localhost版で開いたブラウザタブをすべて閉じた場合も、数秒後にlocalhostサーバーは自動終了します。
 
 確認・開発用にブラウザ自動起動を止める場合:
 
@@ -223,7 +224,7 @@ uv run news-monitor crawl-and-report `
 
 ### Playwrightを使わない版
 
-Chromiumを入れない環境、または軽量確認用です。Playwright必須サイトはスキップされます。
+Chromiumを入れない環境、または軽量確認用です。Playwright必須サイトはスキップされ、スキップ理由は `crawl_skips` に記録されます。
 
 ```powershell
 uv run news-monitor crawl-and-report `
