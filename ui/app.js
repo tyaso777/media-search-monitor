@@ -56,6 +56,7 @@ const els = {
   groupTypeTabs: document.querySelectorAll(".group-type-tab"),
   targetViewTabs: document.querySelectorAll(".target-view-tab"),
   targetPanels: document.querySelectorAll(".target-panel"),
+  adminView: document.querySelector("#admin-view"),
   adminGroupTypeTabs: document.querySelectorAll(".admin-group-type-tab"),
   adminSubtabs: document.querySelectorAll(".admin-subtab"),
   adminSubpanels: document.querySelectorAll(".admin-subpanel"),
@@ -397,6 +398,9 @@ function setTargetView(viewId) {
 
 function setAdminPanel(panelId) {
   state.adminPanel = panelId;
+  const isKeywordPanel = panelId === "admin-keywords-panel";
+  els.adminView?.classList.toggle("admin-keywords-active", isKeywordPanel);
+  els.adminView?.classList.toggle("admin-full-active", !isKeywordPanel);
   els.adminSubtabs.forEach((button) => {
     button.classList.toggle("active", button.dataset.adminPanel === panelId);
   });

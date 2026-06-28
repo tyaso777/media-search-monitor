@@ -231,7 +231,9 @@ main {
 }
 
 #admin-view {
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 380px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  background: #f8fafc;
 }
 
 #requests-view {
@@ -268,6 +270,15 @@ main {
 
 .admin-detail {
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+#admin-view > .keyword-groups {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+#admin-view > .admin-detail {
+  display: contents;
 }
 
 .article-pane {
@@ -379,6 +390,8 @@ input {
 }
 
 .admin-subtabs {
+  grid-column: 1 / -1;
+  grid-row: 1;
   display: flex;
   gap: 6px;
   padding: 10px 14px;
@@ -397,6 +410,8 @@ input {
 }
 
 .admin-subpanel {
+  grid-column: 2;
+  grid-row: 2;
   display: none;
   min-height: 0;
   min-width: 0;
@@ -415,6 +430,14 @@ input {
 #admin-site-health-panel,
 #admin-requests-panel {
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+#admin-view.admin-full-active > .keyword-groups {
+  display: none;
+}
+
+#admin-view.admin-full-active .admin-subpanel.active {
+  grid-column: 1 / -1;
 }
 
 .parent-status {
