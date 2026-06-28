@@ -807,10 +807,19 @@ def rebuild_viewer_cache(conn: sqlite3.Connection, now: datetime | None = None) 
             COUNT(DISTINCT i.result_item_id) AS article_count,
             COUNT(DISTINCT i.site_id) AS site_count,
             MAX(NULLIF(i.published_date, '')) AS latest_published_date,
-            MAX(NULLIF(h.first_seen_at, '')) AS latest_hit_at
+            MAX(CASE
+                WHEN i.result_item_id IS NOT NULL THEN NULLIF(h.first_seen_at, '')
+                ELSE NULL
+            END) AS latest_hit_at
         FROM keyword_groups kg
         LEFT JOIN search_result_hits h ON h.base_keyword_id = kg.base_keyword_id
         LEFT JOIN search_result_items i ON i.result_item_id = h.result_item_id
+            AND EXISTS (
+                SELECT 1
+                FROM sites s_enabled
+                WHERE s_enabled.site_id = i.site_id
+                  AND s_enabled.enabled = 1
+            )
         GROUP BY kg.base_keyword_id, kg.base_keyword, COALESCE(kg.group_type, 'company'), kg.enabled
         """
     ).fetchall()
@@ -923,7 +932,7 @@ def _rebuild_viewer_result_rows(conn: sqlite3.Connection, rebuilt_at: str, today
         FROM search_result_hits h
         JOIN search_result_items i ON i.result_item_id = h.result_item_id
         JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
-        LEFT JOIN sites s ON s.site_id = i.site_id
+        JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
         GROUP BY h.base_keyword_id, i.result_item_id
         ORDER BY
             h.base_keyword_id,
@@ -994,7 +1003,7 @@ def _rebuild_viewer_group_site_filters(
         FROM search_result_hits h
         JOIN search_result_items i ON i.result_item_id = h.result_item_id
         JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
-        LEFT JOIN sites s ON s.site_id = i.site_id
+        JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
         GROUP BY h.base_keyword_id, i.site_id, COALESCE(s.site_name, i.site_id)
         ORDER BY h.base_keyword_id, site_name
         """
@@ -1039,6 +1048,7 @@ def _rebuild_viewer_group_keyword_filters(
         FROM search_result_hits h
         JOIN search_result_items i ON i.result_item_id = h.result_item_id
         JOIN keyword_groups kg ON kg.base_keyword_id = h.base_keyword_id
+        JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
         GROUP BY h.base_keyword_id, h.candidate_keyword
         ORDER BY h.base_keyword_id, h.candidate_keyword
         """

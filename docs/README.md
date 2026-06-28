@@ -34,6 +34,8 @@
 
 | 資料 | 何が書いてあるか |
 |---|---|
+| [site_operation_review.md](site_operation_review.md) | 法務・robots・掲載日取得・検索結果抽出・実装方式を横断して、最終的にクロール対象にするかを判断する一元台帳 |
+| [site_legal_review.md](site_legal_review.md) | サイト別のrobots.txt、規約確認、認証/CAPTCHA/本文取得有無、運用判断ステータスを記録する法務・運用レビュー台帳 |
 | [site_notes/initial_media_targets.md](site_notes/initial_media_targets.md) | 初期対象メディアの考え方・候補整理 |
 
 ## 過去調査メモ
@@ -59,3 +61,5 @@
 | サイト別selectorやパーサ方針を見たい | [parser_strategy.md](parser_strategy.md) |
 | Google CSE対応方針を見たい | [google_cse_strategy.md](google_cse_strategy.md) |
 | Playwright依存を減らせるかの調査を見たい | [playwright_reduction_audit.md](playwright_reduction_audit.md) |
+| 最終的にサイトをクロール対象にするか確認したい | [site_operation_review.md](site_operation_review.md) |
+| サイト別のrobots・規約確認状況を見たい | [site_legal_review.md](site_legal_review.md) |

@@ -131,6 +131,7 @@ pub struct SiteHealthRow {
     site_name: String,
     enabled: bool,
     requires_playwright: bool,
+    decision_reason: String,
     status: String,
     latest_run_hits: i64,
     latest_run_errors: i64,
@@ -495,6 +496,12 @@ fn get_companies_by_type(
             FROM keyword_groups kg
             LEFT JOIN search_result_hits h ON h.base_keyword_id = kg.base_keyword_id
             LEFT JOIN search_result_items i ON i.result_item_id = h.result_item_id
+                AND EXISTS (
+                    SELECT 1
+                    FROM sites s_enabled
+                    WHERE s_enabled.site_id = i.site_id
+                      AND s_enabled.enabled = 1
+                )
             WHERE kg.enabled = 1
               AND COALESCE(kg.group_type, 'company') = ?
             GROUP BY kg.base_keyword_id, kg.base_keyword, kg.group_type
@@ -527,6 +534,7 @@ fn get_companies_by_type(
                 SELECT MAX(i.published_date)
                 FROM search_result_hits h
                 JOIN search_result_items i ON i.result_item_id = h.result_item_id
+                JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
                 WHERE h.base_keyword_id = ?
                   AND i.published_date IS NOT NULL
                   AND i.published_date != ''
@@ -539,7 +547,13 @@ fn get_companies_by_type(
 
         let hit_min: Option<String> = conn
             .query_row(
-                "SELECT MAX(first_seen_at) FROM search_result_hits WHERE base_keyword_id = ?",
+                r#"
+                SELECT MAX(h.first_seen_at)
+                FROM search_result_hits h
+                JOIN search_result_items i ON i.result_item_id = h.result_item_id
+                JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
+                WHERE h.base_keyword_id = ?
+                "#,
                 params![company.base_keyword_id],
                 |row| row.get(0),
             )
@@ -790,7 +804,7 @@ pub fn get_company_results(
                 i.snippet
             FROM search_result_hits h
             JOIN search_result_items i ON i.result_item_id = h.result_item_id
-            LEFT JOIN sites s ON s.site_id = i.site_id
+            JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
             WHERE h.base_keyword_id = ?
             GROUP BY i.result_item_id
             ORDER BY
@@ -804,7 +818,13 @@ pub fn get_company_results(
         .map_err(|err| err.to_string())?;
     let total = conn
         .query_row(
-            "SELECT COUNT(DISTINCT result_item_id) FROM search_result_hits WHERE base_keyword_id = ?",
+            r#"
+            SELECT COUNT(DISTINCT h.result_item_id)
+            FROM search_result_hits h
+            JOIN search_result_items i ON i.result_item_id = h.result_item_id
+            JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
+            WHERE h.base_keyword_id = ?
+            "#,
             params![base_keyword_id],
             |row| row.get(0),
         )
@@ -982,7 +1002,7 @@ fn get_company_site_filter_options(
                 MAX(NULLIF(h.first_seen_at, '')) AS latest_hit_at
             FROM search_result_hits h
             JOIN search_result_items i ON i.result_item_id = h.result_item_id
-            LEFT JOIN sites s ON s.site_id = i.site_id
+            JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
             WHERE h.base_keyword_id = ?
             GROUP BY i.site_id, COALESCE(s.site_name, i.site_id)
             ORDER BY site_name
@@ -1060,6 +1080,7 @@ fn get_company_keyword_filter_options(
                 MAX(NULLIF(h.first_seen_at, '')) AS latest_hit_at
             FROM search_result_hits h
             JOIN search_result_items i ON i.result_item_id = h.result_item_id
+            JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
             WHERE h.base_keyword_id = ?
             GROUP BY h.candidate_keyword
             ORDER BY h.candidate_keyword
@@ -1131,7 +1152,7 @@ fn get_uncached_filtered_company_results(
                 ) AS cache_rank
             FROM search_result_hits h
             JOIN search_result_items i ON i.result_item_id = h.result_item_id
-            LEFT JOIN sites s ON s.site_id = i.site_id
+            JOIN sites s ON s.site_id = i.site_id AND s.enabled = 1
             WHERE h.base_keyword_id = ?
             GROUP BY h.base_keyword_id, i.result_item_id
         )
@@ -1835,6 +1856,7 @@ pub fn list_site_health(db_path: Option<String>) -> Result<Vec<SiteHealthRow>, S
         .to_string();
 
         rows.push(SiteHealthRow {
+            decision_reason: site_decision_reason(&site_id, enabled, requires_playwright),
             site_id,
             site_name,
             enabled,
@@ -1875,6 +1897,35 @@ fn site_status_rank(status: &str) -> i32 {
         "notice" => 2,
         "disabled" => 3,
         _ => 4,
+    }
+}
+
+fn site_decision_reason(site_id: &str, enabled: bool, requires_playwright: bool) -> String {
+    if !enabled {
+        return match site_id {
+            "asahi" | "yomiuri" | "mainichi" | "sankei" | "yamagata_np" | "shinmai"
+            | "iwate_np" | "topics" | "diamond" => {
+                "対象外: 規約上の自動取得制限".to_string()
+            }
+            "chibanippo" => "対象外: 規約上の自動取得制限 / 検索結果抽出不可".to_string(),
+            "hokkaido_np" | "kyoto_np" | "kochi" | "saga_np" | "toyokeizai" => {
+                "対象外: robots不許可".to_string()
+            }
+            "itmedia" => "対象外: robots不許可 / Google CSE直接取得".to_string(),
+            "shikoku_np" => "対象外: 403応答のため取得方法・条件を再確認".to_string(),
+            "automotive_news_jp" => "対象外: 接続不可のため検索 endpoint 未確認".to_string(),
+            "chemical_daily" => "対象外: 公開キーワード検索欄なし".to_string(),
+            "sample_news" | "sample_dynamic_news" => "対象外: 開発用サンプル".to_string(),
+            _ => "対象外: 設定で無効".to_string(),
+        };
+    }
+
+    match site_id {
+        "tokyo_np" | "chunichi" | "jiji" | "impress_watch" | "denki_shimbun" => {
+            "検索対象: Google CSE".to_string()
+        }
+        _ if requires_playwright => "検索対象: Playwright".to_string(),
+        _ => "検索対象: HTTP".to_string(),
     }
 }
 

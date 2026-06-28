@@ -35,7 +35,7 @@ sites:
 
   - site_id: asahi
     site_name: 朝日新聞デジタル
-    enabled: true
+    enabled: false
     search_url_template: "https://sitesearch.asahi.com/sitesearch/?Keywords={query}&Searchsubmit=%E6%A4%9C%E7%B4%A2&iref=pc_gnavi"
     query_encoding: "utf-8"
     requires_playwright: true
@@ -52,7 +52,7 @@ sites:
 
   - site_id: yomiuri
     site_name: 読売新聞オンライン
-    enabled: true
+    enabled: false
     search_url_template: "https://www.yomiuri.co.jp/web-search/?st=1&wo={query}&ac=srch"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -69,7 +69,7 @@ sites:
 
   - site_id: mainichi
     site_name: 毎日新聞
-    enabled: true
+    enabled: false
     search_url_template: "https://mainichi.jp/search?q={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -86,7 +86,7 @@ sites:
 
   - site_id: sankei
     site_name: 産経ニュース
-    enabled: true
+    enabled: false
     search_url_template: "https://www.sankei.com/search/?kw={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -154,7 +154,7 @@ sites:
 
   - site_id: hokkaido_np
     site_name: 北海道新聞デジタル
-    enabled: true
+    enabled: false
     search_url_template: "https://www.hokkaido-np.co.jp/search/?kw={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -222,7 +222,7 @@ sites:
 
   - site_id: yamagata_np
     site_name: 山形新聞
-    enabled: true
+    enabled: false
     search_url_template: "https://www.yamagata-np.jp/search.php?keyword={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -290,7 +290,7 @@ sites:
 
   - site_id: chibanippo
     site_name: 千葉日報
-    enabled: true
+    enabled: false
     search_url_template: "https://www.chibanippo.co.jp/search?search_api_fulltext={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -341,7 +341,7 @@ sites:
 
   - site_id: shinmai
     site_name: 信濃毎日新聞デジタル
-    enabled: true
+    enabled: false
     search_url_template: "https://www.shinmai.co.jp/search?keyword={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -379,7 +379,7 @@ sites:
 
   - site_id: kyoto_np
     site_name: 京都新聞
-    enabled: true
+    enabled: false
     search_url_template: "https://www.kyoto-np.co.jp/search?fulltext={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -515,7 +515,7 @@ sites:
 
   - site_id: iwate_np
     site_name: 岩手日報
-    enabled: true
+    enabled: false
     search_url_template: "https://www.iwate-np.co.jp/article/search?q={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -583,7 +583,7 @@ sites:
 
   - site_id: topics
     site_name: 徳島新聞
-    enabled: true
+    enabled: false
     search_url_template: "https://www.topics.or.jp/search?fulltext={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -600,7 +600,7 @@ sites:
 
   - site_id: kochi
     site_name: 高知新聞
-    enabled: true
+    enabled: false
     search_url_template: "https://www.kochinews.co.jp/article/search?keyword={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -634,7 +634,7 @@ sites:
 
   - site_id: saga_np
     site_name: 佐賀新聞
-    enabled: true
+    enabled: false
     search_url_template: "https://www.saga-s.co.jp/search?fulltext={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -864,7 +864,7 @@ sites:
 
   - site_id: itmedia
     site_name: ITmedia
-    enabled: true
+    enabled: false
     search_url_template: "https://cse.google.com/cse?cx=000492183644671384608%3A6dff3odaltq&q={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -915,7 +915,7 @@ sites:
 
   - site_id: toyokeizai
     site_name: 東洋経済オンライン
-    enabled: true
+    enabled: false
     search_url_template: "https://toyokeizai.net/list/search?fulltext={query}"
     query_encoding: "utf-8"
     requires_playwright: false
@@ -942,7 +942,7 @@ sites:
 
   - site_id: diamond
     site_name: ダイヤモンド・オンライン
-    enabled: true
+    enabled: false
     search_url_template: "https://diamond.jp/list/search?fulltext={query}"
     query_encoding: "utf-8"
     requires_playwright: false

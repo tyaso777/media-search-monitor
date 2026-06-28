@@ -29,7 +29,7 @@ def test_load_sites(repo_root):
     toyokeizai = next(site for site in sites if site.site_id == "toyokeizai")
     assert toyokeizai.search_url_template == "https://toyokeizai.net/list/search?fulltext={query}"
     itmedia = next(site for site in sites if site.site_id == "itmedia")
-    assert itmedia.enabled is True
+    assert itmedia.enabled is False
     assert itmedia.requires_playwright is False
     assert itmedia.fetch_strategy == "google_cse"
     assert itmedia.google_cse_lightweight_candidate is True

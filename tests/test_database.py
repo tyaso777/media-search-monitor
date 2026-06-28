@@ -4,7 +4,7 @@ from datetime import datetime
 
 from news_monitor import database
 from news_monitor.config import load_keywords, load_sites
-from news_monitor.models import KeywordCandidate, ParsedResult
+from news_monitor.models import KeywordCandidate, ParsedResult, SiteConfig
 
 
 def test_import_keywords_and_sites(conn, repo_root):
@@ -155,6 +155,45 @@ def test_rebuild_viewer_cache_summarizes_keyword_groups(conn):
         notes=None,
     )
     database.import_keywords(conn, [keyword, another_candidate, topic])
+    database.import_sites(
+        conn,
+        [
+            SiteConfig(
+                site_id="site-a",
+                site_name="Site A",
+                enabled=True,
+                search_url_template="https://example.com/search?q={query}",
+                query_encoding="utf-8",
+                requires_playwright=False,
+                result_item_selector=".result",
+                title_selector="a",
+                url_selector="a",
+                date_selector=".date",
+                snippet_selector=None,
+                rate_limit_seconds=1,
+                user_agent="test",
+                max_pages=1,
+                next_page_selector=None,
+            ),
+            SiteConfig(
+                site_id="site-b",
+                site_name="Site B",
+                enabled=True,
+                search_url_template="https://example.com/search?q={query}",
+                query_encoding="utf-8",
+                requires_playwright=False,
+                result_item_selector=".result",
+                title_selector="a",
+                url_selector="a",
+                date_selector=".date",
+                snippet_selector=None,
+                rate_limit_seconds=1,
+                user_agent="test",
+                max_pages=1,
+                next_page_selector=None,
+            ),
+        ],
+    )
     conn.execute(
         """
         INSERT INTO search_result_items (

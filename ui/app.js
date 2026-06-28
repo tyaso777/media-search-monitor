@@ -1255,7 +1255,7 @@ async function loadSiteHealth() {
   } catch (error) {
     els.siteHealthList.innerHTML = `<div class="error">${escapeText(error)}</div>`;
     if (els.siteTargetBody) {
-      els.siteTargetBody.innerHTML = `<tr><td colspan="7" class="error">${escapeText(error)}</td></tr>`;
+      els.siteTargetBody.innerHTML = `<tr><td colspan="8" class="error">${escapeText(error)}</td></tr>`;
     }
     if (els.siteTargetCount) els.siteTargetCount.textContent = "取得失敗";
   }
@@ -1267,7 +1267,7 @@ function renderSiteTargets() {
     els.siteTargetCount.textContent = `${state.siteHealthRows.length}件`;
   }
   if (!state.siteHealthRows.length) {
-    els.siteTargetBody.innerHTML = `<tr><td colspan="7" class="empty">対象サイトはまだありません</td></tr>`;
+    els.siteTargetBody.innerHTML = `<tr><td colspan="8" class="empty">対象サイトはまだありません</td></tr>`;
     return;
   }
   els.siteTargetBody.innerHTML = state.siteHealthRows
@@ -1287,6 +1287,7 @@ function renderSiteTargets() {
           <td>${row.requires_playwright ? "必要" : "不要"}</td>
           <td><span class="status-badge ${hasDbHit ? "status-on" : "status-off"}">${hasDbHit ? "あり" : "なし"}</span></td>
           <td>${row.total_items}</td>
+          <td class="site-target-reason">${escapeText(row.decision_reason || "-")}</td>
           <td class="site-target-error">${escapeText(latestError)}</td>
         </tr>
       `;
@@ -1307,6 +1308,9 @@ function renderSiteHealth() {
       }
       if (row.latest_skip_reason) {
         details.push(`最新スキップ: ${row.latest_skip_reason}`);
+      }
+      if (row.decision_reason) {
+        details.push(row.decision_reason);
       }
       return `
         <article class="request-card site-health-card ${escapeText(row.status)}">
