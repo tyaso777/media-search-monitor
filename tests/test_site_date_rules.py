@@ -487,6 +487,34 @@ def test_shokuhin_sangyo_uses_news_article_cards(repo_root):
     assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2025/08/22"
 
 
+def test_nikkan_jidosha_uses_scoped_search_result_cards(repo_root):
+    sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
+    site = sites["nikkan_jidosha"]
+
+    assert site.enabled is True
+    assert site.search_url_template == "https://www.netdenjd.com/?s={query}"
+    assert site.result_container_selector == ".search-reslut-contents"
+    assert site.result_item_selector == ".post_content"
+    assert site.title_selector == "h5.clearfix > a"
+    assert site.url_selector == "h5.clearfix > a"
+    assert site.date_selector == "ul.post_details.simple span.date"
+    assert site.snippet_selector == "ul.post_details.simple"
+    assert site.date_rule == "explicit_year_only"
+    assert site.require_keyword_in_result is False
+
+    html = (repo_root / "tests" / "fixtures" / "nikkan_jidosha_search_result.html").read_text(
+        encoding="utf-8"
+    )
+    results = parse_search_results(html, site, "https://www.netdenjd.com/?s=toyota")
+
+    assert len(results) == 1
+    assert results[0].title == "Toyota industry primer"
+    assert results[0].url == "https://www.netdenjd.com/archives/676767"
+    assert results[0].published_date == "2026年6月29日 05:00"
+    assert "Automotive makers" in (results[0].snippet or "")
+    assert normalize_published_date(results[0].published_date, None, site.date_rule) == "2026/06/29"
+
+
 def test_shizushin_uses_news_at_s_search_result_cards(repo_root):
     sites = {site.site_id: site for site in load_sites(repo_root / "config" / "sites.yaml")}
     site = sites["shizushin"]

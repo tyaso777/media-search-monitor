@@ -801,19 +801,20 @@ sites:
   - site_id: nikkan_jidosha
     site_name: 日刊自動車新聞 電子版
     enabled: true
-    search_url_template: "https://www.netdenjd.com/search?keyword={query}"
+    search_url_template: "https://www.netdenjd.com/?s={query}"
     query_encoding: "utf-8"
     requires_playwright: false
-    result_item_selector: "article, .search-result, .article-list li, li"
-    title_selector: "h2 a, h3 a, .title a, a"
-    url_selector: "h2 a, h3 a, .title a, a"
-    date_selector: "time, .date"
-    snippet_selector: "p, .summary"
+    result_container_selector: ".search-reslut-contents"
+    result_item_selector: ".post_content"
+    title_selector: "h5.clearfix > a"
+    url_selector: "h5.clearfix > a"
+    date_selector: "ul.post_details.simple span.date"
+    snippet_selector: "ul.post_details.simple"
     rate_limit_seconds: 3
     user_agent: "news-monitor-bot/0.1"
     max_pages: 1
     next_page_selector: null
-    notes: "Automotive trade paper; selector verification pending."
+    notes: "Search form uses the WordPress s parameter. Extraction is scoped to .search-reslut-contents .post_content to avoid global navigation, category links, and sidebars."
     url_include_patterns:
       - "https://www.netdenjd.com/archives/"
     url_exclude_patterns:

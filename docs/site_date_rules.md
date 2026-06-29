@@ -70,7 +70,7 @@
 | nikkei_business | `time` / `.date` 想定。記事URLに導線パラメータ `i_cid` が付く場合がある。 | `machine_datetime`。年付き値のみ。canonical URLでは `i_cid` を削除する。 | ルールサポート検査。`tests/test_url_utils.py` で `i_cid` を削除することを検査。 |
 | nikkei_xtech | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
 | sbbit | `.crd_ttl-pubdate` に年付き日付想定。 | `explicit_year_only`。 | 年付き日付の共通正規化テスト。 |
-| nikkan_jidosha | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |
+| nikkan_jidosha | `.search-reslut-contents .post_content` 内の `ul.post_details.simple span.date`。 | `explicit_year_only`。例 `2026年6月29日 05:00` の年付き値のみ。 | 検索フォームは `s` パラメータ。カテゴリ・サイドバー・お知らせリンクを除外するため検索結果カードに限定。 |
 | denshi_device | 検索結果領域は `.main-contents.single-contents.dd-main-content`。カードは `article`、タイトル/URLは `h3.title a`、掲載日は `ul.post-meta li.date` に `2026.06.23` のようなドット区切り年付き日付で出る。 | `machine_datetime`。検索結果カード単位のCSS selectorで取得し、ドット区切り年付き日付を `yyyy/mm/dd` に正規化する。 | `tests/fixtures/denshi_device_search_result.html` で検索結果領域、カードselector、URL、`2026.06.23` の正規化を検査。 |
 | itmedia | Google CSEで独立日付なし。snippetに `2日前` と `2026/05/28` のような相対/絶対日付が混在する。 | `relative_japanese_or_explicit_year`。`.gs-snippet` を日付候補として取得し、相対日付はクロール取得時刻基準で正規化する。 | Google CSE fixtureで `2日前` と `2026/05/28` の両方を正規化できることを検査。 |
 | toyokeizai | `time` / `.date` 想定。 | `machine_datetime`。年付き値のみ。 | ルールサポート検査。 |

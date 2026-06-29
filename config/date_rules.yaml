@@ -114,8 +114,8 @@ rules:
     date_rule: explicit_year_only
     rationale: "Configured to accept only year-qualified dates from search results."
   - site_id: nikkan_jidosha
-    date_rule: machine_datetime
-    rationale: "Configured to accept only year-qualified dates from search results."
+    date_rule: explicit_year_only
+    rationale: "Search results expose explicit Japanese year-qualified dates such as 2026年6月29日 05:00."
   - site_id: denshi_device
     date_rule: machine_datetime
     rationale: "Configured to accept only year-qualified dates from search results."
