@@ -868,7 +868,7 @@ input {
 
 .site-target-table {
   width: 100%;
-  min-width: 1080px;
+  min-width: 1240px;
   border-collapse: separate;
   border-spacing: 0;
   overflow: visible;
@@ -912,6 +912,7 @@ input {
 }
 
 .site-target-reason,
+.site-target-structure,
 .site-target-error {
   max-width: 360px;
   color: #667381;
@@ -922,6 +923,15 @@ input {
 .site-target-reason {
   max-width: 260px;
   color: #46566a;
+}
+
+.site-target-structure {
+  max-width: 300px;
+  color: #46566a;
+}
+
+.site-target-structure .row-sub {
+  margin-top: 4px;
 }
 
 .article-load-bar {

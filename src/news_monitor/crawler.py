@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from statistics import median
 from threading import BoundedSemaphore
 from typing import Protocol
 
@@ -38,6 +40,22 @@ class FetcherProtocol(Protocol):
 
 
 APP_TIMEZONE = timezone(timedelta(hours=9))
+
+
+def _keyword_in_title(keyword: str | None, title: str | None) -> bool:
+    """Return true when the normalized keyword appears in the result title."""
+
+    keyword_text = _normalize_match_text(keyword)
+    title_text = _normalize_match_text(title)
+    return bool(keyword_text and title_text and keyword_text in title_text)
+
+
+def _normalize_match_text(value: str | None) -> str:
+    """Normalize search text for lightweight title containment checks."""
+
+    if not value:
+        return ""
+    return re.sub(r"\s+", "", str(value)).casefold()
 
 
 def utc_now() -> str:
@@ -158,6 +176,47 @@ class Crawler:
 
         article_date_lookups = 0
         article_date_cache: dict[str, str | None] = {}
+        if self._structure_check_due(conn, site):
+            if self._requires_playwright_runtime(site) and not self.app_config.playwright.enabled:
+                self._write_with_retry(
+                    conn,
+                    lambda: self._record_skips(conn, run_id, site, keywords, "playwright_disabled"),
+                )
+                return
+            try:
+                self._run_structure_check(conn, run_id, site)
+            except Exception as exc:
+                query = encode_query(
+                    self.app_config.crawler.structure_check_keyword,
+                    site.query_encoding,
+                )
+                page_url = site.search_url_template.format(query=query)
+                self._write_with_retry(
+                    conn,
+                    lambda: self._record_fetch_error_without_keyword(
+                        conn, run_id, site, page_url, exc
+                    ),
+                )
+                status_code = self._http_status_code(exc)
+                if status_code in {403, 429}:
+                    reason = database.site_backoff_reason(status_code)
+                    self._write_with_retry(
+                        conn,
+                        lambda exc=exc, status_code=status_code: self._record_site_backoff(
+                            conn, site, status_code, exc
+                        ),
+                    )
+                    self._write_with_retry(
+                        conn,
+                        lambda: self._record_skips(conn, run_id, site, keywords, reason),
+                    )
+                    LOGGER.warning(
+                        "Stopped crawling %s until backoff expires after structure check HTTP %s",
+                        site.site_id,
+                        status_code,
+                    )
+                    return
+                LOGGER.warning("Failed structure check for %s: %s", site.site_id, exc)
         for index, keyword in enumerate(keywords):
             if self._requires_playwright_runtime(site) and not self.app_config.playwright.enabled:
                 self._write_with_retry(
@@ -241,6 +300,159 @@ class Crawler:
                 LOGGER.warning("Failed to crawl %s for %s: %s", site.site_id, query, exc)
             if self.sleep_enabled and site.rate_limit_seconds > 0:
                 time.sleep(site.rate_limit_seconds)
+
+    def _structure_check_due(self, conn: sqlite3.Connection, site: SiteConfig) -> bool:
+        """Return true when this site needs one extraction health check in this crawl."""
+
+        config = self.app_config.crawler
+        if not config.structure_check_enabled:
+            return False
+        if config.structure_check_interval_hours <= 0:
+            return True
+        latest = database.latest_site_structure_check(
+            conn,
+            site.site_id,
+            config.structure_check_keyword,
+        )
+        if latest is None:
+            return True
+        try:
+            checked_at = datetime.fromisoformat(str(latest["checked_at"]))
+            now = datetime.fromisoformat(utc_now())
+        except ValueError:
+            return True
+        return now - checked_at >= timedelta(hours=config.structure_check_interval_hours)
+
+    def _run_structure_check(
+        self, conn: sqlite3.Connection, run_id: str, site: SiteConfig
+    ) -> None:
+        """Fetch the configured structure-check keyword and record extraction health only."""
+
+        keyword = self.app_config.crawler.structure_check_keyword
+        query = encode_query(keyword, site.query_encoding)
+        page_url = site.search_url_template.format(query=query)
+        fetcher = self._fetcher_for_site(site)
+        if site.fetch_strategy == "google_cse":
+            fetched = self._fetch_google_cse(page_url, site, fetcher)
+        elif self._requires_playwright_runtime(site):
+            with self.playwright_semaphore:
+                fetched = fetcher.fetch(page_url, site)
+        else:
+            fetched = fetcher.fetch(page_url, site)
+        fetched_at = utc_now()
+        results = self._filter_results(
+            self._normalize_result_dates(
+                parse_search_results(fetched.html, site, fetched.url),
+                site,
+                fetched_at,
+            ),
+            site,
+            keyword,
+        )
+        self._write_with_retry(
+            conn,
+            lambda: self._record_structure_check(
+                conn, run_id, site, keyword, fetched_at, results
+            ),
+        )
+
+    def _record_structure_check(
+        self,
+        conn: sqlite3.Connection,
+        run_id: str,
+        site: SiteConfig,
+        candidate_keyword: str,
+        checked_at: str,
+        results: list[ParsedResult],
+    ) -> None:
+        """Record a title keyword match health check for one site's parsed results."""
+
+        result_count = len(results)
+        title_match_count = sum(
+            1
+            for result in results
+            if _keyword_in_title(candidate_keyword, result.title)
+        )
+        title_match_rate = title_match_count / result_count if result_count else 0.0
+        status, reason = self._structure_check_status(
+            conn,
+            site,
+            candidate_keyword,
+            result_count,
+            title_match_count,
+            title_match_rate,
+        )
+        database.record_site_structure_check(
+            conn,
+            site_id=site.site_id,
+            run_id=run_id,
+            candidate_keyword_id=None,
+            candidate_keyword=candidate_keyword,
+            checked_at=checked_at,
+            result_count=result_count,
+            title_match_count=title_match_count,
+            title_match_rate=title_match_rate,
+            status=status,
+            reason=reason,
+        )
+        conn.commit()
+
+    def _structure_check_status(
+        self,
+        conn: sqlite3.Connection,
+        site: SiteConfig,
+        candidate_keyword: str,
+        result_count: int,
+        title_match_count: int,
+        title_match_rate: float,
+    ) -> tuple[str, str]:
+        """Classify one structure check against absolute and site-specific baselines."""
+
+        config = self.app_config.crawler
+        warning_rate = config.structure_check_title_match_warning_rate
+        if result_count == 0:
+            return "warning", "要確認: ヒット0件"
+        elif title_match_rate < warning_rate:
+            return (
+                "warning",
+                f"要確認: タイトル一致率が{warning_rate:.0%}未満 "
+                f"({title_match_count}/{result_count})",
+            )
+
+        baseline = database.site_structure_baseline_checks(
+            conn, site.site_id, candidate_keyword, limit=10
+        )
+        min_baseline = config.structure_check_min_baseline_checks
+        if len(baseline) < min_baseline:
+            return (
+                "ok",
+                f"OK: 基準作成中 ({len(baseline)}/{min_baseline}) "
+                f"ヒット{result_count}件 タイトル一致率{title_match_rate:.0%}",
+            )
+
+        median_result_count = float(median([row["result_count"] for row in baseline]))
+        median_title_match_rate = float(
+            median([row["title_match_rate"] for row in baseline])
+        )
+        drop_ratio = config.structure_check_result_count_drop_ratio
+        if median_result_count > 0 and result_count < median_result_count * drop_ratio:
+            return (
+                "warning",
+                f"要確認: ヒット数急減 ({result_count}件 / 過去中央値{median_result_count:g}件)",
+            )
+        drop_points = config.structure_check_title_match_rate_drop_points
+        if title_match_rate < median_title_match_rate - drop_points:
+            return (
+                "warning",
+                "要確認: タイトル一致率急低下 "
+                f"({title_match_rate:.0%} / 過去中央値{median_title_match_rate:.0%})",
+            )
+        return (
+            "ok",
+            "OK: 過去中央値内 "
+            f"ヒット{result_count}件/中央値{median_result_count:g}件 "
+            f"タイトル一致率{title_match_rate:.0%}/中央値{median_title_match_rate:.0%}",
+        )
 
     def _http_status_code(self, exc: Exception) -> int | None:
         """Extract an HTTP status code from httpx-like exceptions."""
@@ -435,6 +647,28 @@ class Crawler:
             str(exc),
             site.site_id,
             keyword,
+            page_url,
+        )
+        conn.commit()
+
+    def _record_fetch_error_without_keyword(
+        self,
+        conn: sqlite3.Connection,
+        run_id: str,
+        site: SiteConfig,
+        page_url: str,
+        exc: Exception,
+    ) -> None:
+        """Persist a site-level fetch error without tying it to a user keyword."""
+
+        database.record_fetch_error(
+            conn,
+            run_id,
+            utc_now(),
+            type(exc).__name__,
+            str(exc),
+            site.site_id,
+            None,
             page_url,
         )
         conn.commit()

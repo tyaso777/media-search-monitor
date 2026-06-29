@@ -11,6 +11,14 @@ def test_load_app_config(repo_root):
     assert app_config.crawler.max_concurrent_sites == 8
     assert app_config.crawler.article_date_lookup_enabled is True
     assert app_config.crawler.article_date_lookup_max_per_site == 30
+    assert app_config.crawler.structure_check_enabled is True
+    assert app_config.crawler.structure_check_interval_hours == 24
+    assert app_config.crawler.structure_check_keyword == "トヨタ"
+    assert app_config.crawler.structure_check_min_results == 5
+    assert app_config.crawler.structure_check_min_baseline_checks == 3
+    assert app_config.crawler.structure_check_result_count_drop_ratio == 0.5
+    assert app_config.crawler.structure_check_title_match_rate_drop_points == 0.3
+    assert app_config.crawler.structure_check_title_match_warning_rate == 0.2
     assert app_config.report.output_dir == "reports"
 
 

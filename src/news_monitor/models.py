@@ -29,6 +29,14 @@ class CrawlerConfig:
     article_date_lookup_enabled: bool
     article_date_lookup_max_per_site: int
     article_date_lookup_rate_limit_seconds: float
+    structure_check_enabled: bool
+    structure_check_interval_hours: int
+    structure_check_keyword: str
+    structure_check_min_results: int
+    structure_check_min_baseline_checks: int
+    structure_check_result_count_drop_ratio: float
+    structure_check_title_match_rate_drop_points: float
+    structure_check_title_match_warning_rate: float
 
 
 @dataclass(frozen=True)

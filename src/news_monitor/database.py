@@ -169,6 +169,21 @@ def init_db(conn: sqlite3.Connection) -> None:
             last_failed_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS site_structure_checks (
+            check_id TEXT PRIMARY KEY,
+            site_id TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            candidate_keyword_id TEXT,
+            candidate_keyword TEXT NOT NULL,
+            checked_at TEXT NOT NULL,
+            result_count INTEGER NOT NULL,
+            title_match_count INTEGER NOT NULL,
+            title_match_rate REAL NOT NULL,
+            status TEXT NOT NULL,
+            reason TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_site_structure_checks_site_time
+            ON site_structure_checks(site_id, checked_at);
         CREATE TABLE IF NOT EXISTS site_requests (
             request_id TEXT PRIMARY KEY,
             site_name TEXT NOT NULL,
@@ -685,6 +700,89 @@ def record_skip(
             keyword["candidate_keyword_id"] if keyword else None,
             reason,
             created_at,
+        ),
+    )
+
+
+def latest_site_structure_check(
+    conn: sqlite3.Connection, site_id: str, candidate_keyword: str | None = None
+) -> sqlite3.Row | None:
+    """Return the latest extraction health check for one site."""
+
+    keyword_filter = "AND candidate_keyword = ?" if candidate_keyword is not None else ""
+    params: tuple[object, ...] = (
+        (site_id, candidate_keyword) if candidate_keyword is not None else (site_id,)
+    )
+    return conn.execute(
+        f"""
+        SELECT check_id, site_id, run_id, candidate_keyword_id, candidate_keyword,
+               checked_at, result_count, title_match_count, title_match_rate, status, reason
+        FROM site_structure_checks
+        WHERE site_id = ?
+          {keyword_filter}
+        ORDER BY checked_at DESC
+        LIMIT 1
+        """,
+        params,
+    ).fetchone()
+
+
+def site_structure_baseline_checks(
+    conn: sqlite3.Connection, site_id: str, candidate_keyword: str, limit: int = 10
+) -> list[sqlite3.Row]:
+    """Return recent OK extraction checks used as a site-specific baseline."""
+
+    return conn.execute(
+        """
+        SELECT check_id, site_id, run_id, candidate_keyword_id, candidate_keyword,
+               checked_at, result_count, title_match_count, title_match_rate, status, reason
+        FROM site_structure_checks
+        WHERE site_id = ?
+          AND candidate_keyword = ?
+          AND status = 'ok'
+        ORDER BY checked_at DESC
+        LIMIT ?
+        """,
+        (site_id, candidate_keyword, int(limit)),
+    ).fetchall()
+
+
+def record_site_structure_check(
+    conn: sqlite3.Connection,
+    *,
+    site_id: str,
+    run_id: str,
+    candidate_keyword_id: str | None,
+    candidate_keyword: str,
+    checked_at: str,
+    result_count: int,
+    title_match_count: int,
+    title_match_rate: float,
+    status: str,
+    reason: str | None,
+) -> None:
+    """Persist one search-result extraction health check."""
+
+    conn.execute(
+        """
+        INSERT INTO site_structure_checks (
+            check_id, site_id, run_id, candidate_keyword_id, candidate_keyword,
+            checked_at, result_count, title_match_count, title_match_rate, status, reason
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            uuid.uuid4().hex,
+            site_id,
+            run_id,
+            candidate_keyword_id,
+            candidate_keyword,
+            checked_at,
+            int(result_count),
+            int(title_match_count),
+            float(title_match_rate),
+            status,
+            reason,
         ),
     )
 

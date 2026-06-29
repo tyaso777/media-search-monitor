@@ -120,6 +120,22 @@ def load_app_config(path: Path) -> AppConfig:
             article_date_lookup_rate_limit_seconds=float(
                 crawler.get("article_date_lookup_rate_limit_seconds", 1.0)
             ),
+            structure_check_enabled=_as_bool(crawler.get("structure_check_enabled", True)),
+            structure_check_interval_hours=int(crawler.get("structure_check_interval_hours", 24)),
+            structure_check_keyword=str(crawler.get("structure_check_keyword", "トヨタ")),
+            structure_check_min_results=int(crawler.get("structure_check_min_results", 5)),
+            structure_check_min_baseline_checks=int(
+                crawler.get("structure_check_min_baseline_checks", 3)
+            ),
+            structure_check_result_count_drop_ratio=float(
+                crawler.get("structure_check_result_count_drop_ratio", 0.5)
+            ),
+            structure_check_title_match_rate_drop_points=float(
+                crawler.get("structure_check_title_match_rate_drop_points", 0.3)
+            ),
+            structure_check_title_match_warning_rate=float(
+                crawler.get("structure_check_title_match_warning_rate", 0.2)
+            ),
         ),
         report=ReportConfig(output_dir=str(report.get("output_dir", "reports"))),
     )

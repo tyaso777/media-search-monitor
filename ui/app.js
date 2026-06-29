@@ -174,6 +174,37 @@ function siteHealthLabel(status) {
   return labels[status] ?? status;
 }
 
+function structureCheckLabel(row) {
+  const status = row.structure_check_status;
+  if (status === "ok") return "OK";
+  if (status === "warning") return "要確認";
+  return "未確認";
+}
+
+function structureCheckClass(row) {
+  const status = row.structure_check_status;
+  if (status === "ok") return "status-on";
+  if (status === "warning") return "status-off";
+  return "";
+}
+
+function structureCheckDetail(row) {
+  if (!row.structure_check_status) return "";
+  const parts = [];
+  if (row.structure_check_at) parts.push(row.structure_check_at);
+  if (row.structure_check_keyword) parts.push(`KW: ${row.structure_check_keyword}`);
+  if (Number.isFinite(row.structure_check_result_count)) {
+    parts.push(
+      `タイトル一致 ${row.structure_check_title_match_count || 0}/${row.structure_check_result_count}`,
+    );
+  }
+  if (Number.isFinite(row.structure_check_title_match_rate)) {
+    parts.push(`${Math.round(row.structure_check_title_match_rate * 100)}%`);
+  }
+  if (row.structure_check_reason) parts.push(row.structure_check_reason);
+  return parts.join(" / ");
+}
+
 function updateKeywordRequestPlaceholders() {
   const isTopic = els.keywordRequestGroupType.value === "topic";
   els.keywordRequestBase.placeholder = isTopic ? "例: 生成AI" : "例: トヨタ自動車";
@@ -1255,7 +1286,7 @@ async function loadSiteHealth() {
   } catch (error) {
     els.siteHealthList.innerHTML = `<div class="error">${escapeText(error)}</div>`;
     if (els.siteTargetBody) {
-      els.siteTargetBody.innerHTML = `<tr><td colspan="8" class="error">${escapeText(error)}</td></tr>`;
+      els.siteTargetBody.innerHTML = `<tr><td colspan="9" class="error">${escapeText(error)}</td></tr>`;
     }
     if (els.siteTargetCount) els.siteTargetCount.textContent = "取得失敗";
   }
@@ -1267,7 +1298,7 @@ function renderSiteTargets() {
     els.siteTargetCount.textContent = `${state.siteHealthRows.length}件`;
   }
   if (!state.siteHealthRows.length) {
-    els.siteTargetBody.innerHTML = `<tr><td colspan="8" class="empty">対象サイトはまだありません</td></tr>`;
+    els.siteTargetBody.innerHTML = `<tr><td colspan="9" class="empty">対象サイトはまだありません</td></tr>`;
     return;
   }
   els.siteTargetBody.innerHTML = state.siteHealthRows
@@ -1276,6 +1307,7 @@ function renderSiteTargets() {
       const latestError = row.latest_error_message
         ? `${row.latest_error_type || ""} ${row.latest_error_message}`
         : "-";
+      const structureDetail = structureCheckDetail(row);
       return `
         <tr>
           <td>
@@ -1287,6 +1319,10 @@ function renderSiteTargets() {
           <td>${row.requires_playwright ? "必要" : "不要"}</td>
           <td><span class="status-badge ${hasDbHit ? "status-on" : "status-off"}">${hasDbHit ? "あり" : "なし"}</span></td>
           <td>${row.total_items}</td>
+          <td class="site-target-structure">
+            <span class="status-badge ${structureCheckClass(row)}">${escapeText(structureCheckLabel(row))}</span>
+            ${structureDetail ? `<div class="row-sub">${escapeText(structureDetail)}</div>` : ""}
+          </td>
           <td class="site-target-reason">${escapeText(row.decision_reason || "-")}</td>
           <td class="site-target-error">${escapeText(latestError)}</td>
         </tr>
@@ -1303,11 +1339,15 @@ function renderSiteHealth() {
   els.siteHealthList.innerHTML = state.siteHealthRows
     .map((row) => {
       const details = [];
+      const structureDetail = structureCheckDetail(row);
       if (row.latest_error_message) {
         details.push(`最新エラー: ${row.latest_error_type || ""} ${row.latest_error_message}`);
       }
       if (row.latest_skip_reason) {
         details.push(`最新スキップ: ${row.latest_skip_reason}`);
+      }
+      if (structureDetail) {
+        details.push(`抽出確認: ${structureDetail}`);
       }
       if (row.decision_reason) {
         details.push(row.decision_reason);
@@ -1324,6 +1364,7 @@ function renderSiteHealth() {
             <span>最新エラー ${row.latest_run_errors}</span>
             <span>総記事 ${row.total_items}</span>
             <span>日付欠落 ${row.missing_published_dates}</span>
+            <span>抽出確認 ${escapeText(structureCheckLabel(row))}</span>
           </div>
           ${details.length ? `<div class="implementer-comment">${escapeText(details.join(" / "))}</div>` : ""}
         </article>

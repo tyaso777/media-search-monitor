@@ -42,6 +42,59 @@ def test_result_and_hit_upserts_are_url_and_candidate_scoped(imported_conn, repo
     assert database.count_rows(imported_conn, "search_result_hits") == 2
 
 
+def test_site_structure_check_roundtrip(conn):
+    database.record_site_structure_check(
+        conn,
+        site_id="sample_news",
+        run_id="run-1",
+        candidate_keyword_id="kwc-1",
+        candidate_keyword="Example",
+        checked_at="2026-06-29T10:00:00+09:00",
+        result_count=10,
+        title_match_count=2,
+        title_match_rate=0.2,
+        status="ok",
+        reason="OK",
+    )
+    conn.commit()
+
+    row = database.latest_site_structure_check(conn, "sample_news")
+
+    assert row["site_id"] == "sample_news"
+    assert row["candidate_keyword"] == "Example"
+    assert row["result_count"] == 10
+    assert row["title_match_count"] == 2
+    assert row["title_match_rate"] == 0.2
+    assert row["status"] == "ok"
+
+
+def test_site_structure_baseline_checks_return_recent_ok_rows(conn):
+    for index, status in enumerate(["ok", "warning", "ok", "ok"]):
+        database.record_site_structure_check(
+            conn,
+            site_id="sample_news",
+            run_id=f"run-{index}",
+            candidate_keyword_id=None,
+            candidate_keyword="トヨタ",
+            checked_at=f"2026-06-29T1{index}:00:00+09:00",
+            result_count=10 + index,
+            title_match_count=5,
+            title_match_rate=0.5,
+            status=status,
+            reason=status,
+        )
+    conn.commit()
+
+    rows = database.site_structure_baseline_checks(conn, "sample_news", "トヨタ", limit=2)
+
+    assert [row["status"] for row in rows] == ["ok", "ok"]
+    assert [row["result_count"] for row in rows] == [13, 12]
+    latest_toyota = database.latest_site_structure_check(conn, "sample_news", "トヨタ")
+    latest_other = database.latest_site_structure_check(conn, "sample_news", "キーエンス")
+    assert latest_toyota["result_count"] == 13
+    assert latest_other is None
+
+
 def test_import_keywords_migrates_legacy_ids(conn):
     legacy_keyword = KeywordCandidate(
         base_keyword_id="b001",

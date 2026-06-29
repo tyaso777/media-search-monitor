@@ -86,8 +86,84 @@ def test_crawl_persists_results_and_skips_playwright_disabled(imported_conn, rep
     assert database.count_rows(imported_conn, "fetch_errors") == 0
 
 
+def test_crawl_records_structure_warning_when_title_match_rate_is_low(imported_conn, repo_root, fixture_html):
+    app_config = load_app_config(repo_root / "config" / "app.yaml")
+    app_config = replace(
+        app_config,
+        crawler=replace(
+            app_config.crawler,
+            structure_check_min_results=2,
+            structure_check_title_match_warning_rate=0.6,
+        ),
+    )
+    crawler = Crawler(
+        imported_conn,
+        app_config,
+        static_fetcher=StaticFixtureFetcher(fixture_html),
+        sleep_enabled=False,
+    )
+
+    crawler.crawl()
+
+    check = imported_conn.execute(
+        "SELECT * FROM site_structure_checks WHERE site_id = 'sample_news'"
+    ).fetchone()
+    assert check["result_count"] == 2
+    assert check["candidate_keyword"] == "トヨタ"
+    assert check["title_match_count"] == 1
+    assert check["title_match_rate"] == 0.5
+    assert check["status"] == "warning"
+    assert "タイトル一致率" in check["reason"]
+
+
+def test_crawl_records_structure_warning_when_result_count_drops(imported_conn, repo_root, fixture_html):
+    for index in range(3):
+        database.record_site_structure_check(
+            imported_conn,
+            site_id="sample_news",
+            run_id=f"baseline-{index}",
+            candidate_keyword_id=None,
+            candidate_keyword="トヨタ",
+            checked_at=f"2026-06-2{index}T10:00:00+09:00",
+            result_count=10,
+            title_match_count=8,
+            title_match_rate=0.8,
+            status="ok",
+            reason="baseline",
+        )
+    imported_conn.commit()
+    app_config = load_app_config(repo_root / "config" / "app.yaml")
+    app_config = replace(
+        app_config,
+        crawler=replace(
+            app_config.crawler,
+            structure_check_interval_hours=0,
+            structure_check_title_match_warning_rate=0.1,
+        ),
+    )
+    crawler = Crawler(
+        imported_conn,
+        app_config,
+        static_fetcher=StaticFixtureFetcher(fixture_html),
+        sleep_enabled=False,
+    )
+
+    crawler.crawl()
+
+    check = imported_conn.execute(
+        "SELECT * FROM site_structure_checks WHERE site_id = 'sample_news' ORDER BY checked_at DESC LIMIT 1"
+    ).fetchone()
+    assert check["result_count"] == 2
+    assert check["status"] == "warning"
+    assert "ヒット数急減" in check["reason"]
+
+
 def test_crawl_records_errors_and_continues(conn, repo_root):
     app_config = load_app_config(repo_root / "config" / "app.yaml")
+    app_config = replace(
+        app_config,
+        crawler=replace(app_config.crawler, structure_check_enabled=False),
+    )
     keywords = database.enabled_keywords(conn)
     assert keywords == []
     from news_monitor.config import load_keywords
@@ -111,6 +187,10 @@ def test_crawl_records_errors_and_continues(conn, repo_root):
 
 def test_crawl_backs_off_site_after_403(conn, repo_root, fixture_html):
     app_config = load_app_config(repo_root / "config" / "app.yaml")
+    app_config = replace(
+        app_config,
+        crawler=replace(app_config.crawler, structure_check_enabled=False),
+    )
     from news_monitor.config import load_keywords
 
     database.import_keywords(conn, load_keywords(repo_root / "config" / "keywords.csv")[:3])
@@ -221,7 +301,11 @@ def test_google_cse_fetches_are_globally_serialized(conn, repo_root):
     app_config = load_app_config(repo_root / "config" / "app.yaml")
     app_config = replace(
         app_config,
-        crawler=replace(app_config.crawler, max_concurrent_sites=2),
+        crawler=replace(
+            app_config.crawler,
+            max_concurrent_sites=2,
+            structure_check_enabled=False,
+        ),
     )
     from news_monitor.config import load_keywords
 
@@ -258,7 +342,11 @@ def test_google_cse_fetches_wait_between_requests(conn, repo_root):
     app_config = load_app_config(repo_root / "config" / "app.yaml")
     app_config = replace(
         app_config,
-        crawler=replace(app_config.crawler, max_concurrent_sites=2),
+        crawler=replace(
+            app_config.crawler,
+            max_concurrent_sites=2,
+            structure_check_enabled=False,
+        ),
     )
     from news_monitor.config import load_keywords
 

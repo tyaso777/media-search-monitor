@@ -142,6 +142,13 @@ pub struct SiteHealthRow {
     latest_error_at: Option<String>,
     latest_skip_reason: Option<String>,
     latest_skip_at: Option<String>,
+    structure_check_status: Option<String>,
+    structure_check_reason: Option<String>,
+    structure_check_keyword: Option<String>,
+    structure_check_at: Option<String>,
+    structure_check_result_count: Option<i64>,
+    structure_check_title_match_count: Option<i64>,
+    structure_check_title_match_rate: Option<f64>,
 }
 
 fn resolve_db_path(db_path: Option<String>) -> Result<PathBuf, String> {
@@ -1842,10 +1849,39 @@ pub fn list_site_health(db_path: Option<String>) -> Result<Vec<SiteHealthRow>, S
                 |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
             )
             .ok();
+        let latest_structure_check = conn
+            .query_row(
+                r#"
+                SELECT status, reason, candidate_keyword, checked_at,
+                       result_count, title_match_count, title_match_rate
+                FROM site_structure_checks
+                WHERE site_id = ?
+                ORDER BY checked_at DESC
+                LIMIT 1
+                "#,
+                params![site_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, i64>(5)?,
+                        row.get::<_, f64>(6)?,
+                    ))
+                },
+            )
+            .ok();
         let status = if !enabled {
             "disabled"
         } else if latest_run_errors > 0 {
             "error"
+        } else if latest_structure_check
+            .as_ref()
+            .is_some_and(|row| row.0 == "warning")
+        {
+            "warning"
         } else if latest_run_id.is_some() && latest_run_hits == 0 {
             "warning"
         } else if missing_published_dates > 0 {
@@ -1871,6 +1907,13 @@ pub fn list_site_health(db_path: Option<String>) -> Result<Vec<SiteHealthRow>, S
             latest_error_at: latest_error.map(|row| row.2),
             latest_skip_reason: latest_skip.as_ref().map(|row| row.0.clone()),
             latest_skip_at: latest_skip.map(|row| row.1),
+            structure_check_status: latest_structure_check.as_ref().map(|row| row.0.clone()),
+            structure_check_reason: latest_structure_check.as_ref().and_then(|row| row.1.clone()),
+            structure_check_keyword: latest_structure_check.as_ref().map(|row| row.2.clone()),
+            structure_check_at: latest_structure_check.as_ref().map(|row| row.3.clone()),
+            structure_check_result_count: latest_structure_check.as_ref().map(|row| row.4),
+            structure_check_title_match_count: latest_structure_check.as_ref().map(|row| row.5),
+            structure_check_title_match_rate: latest_structure_check.as_ref().map(|row| row.6),
         });
     }
 
